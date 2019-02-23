@@ -1,2 +1,2 @@
-# lightning-explorer
+# Lightning explorer
 GPU accelerated lightning network explorer
