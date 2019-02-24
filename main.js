@@ -37,60 +37,93 @@ function Resized()
 
 function PageLoaded()
 {
-    let request  = new XMLHttpRequest();
-
-    let errorFunction = function()
+    if (window.location.protocol === "file:")
     {
-        let loadingText = document.getElementById("loading_text");
-        loadingText.innerHTML = "Loading error, see console for details";
-        loadingText.style.fontSize = "10vh";
-    };
-
-    request.onload = function(ev)
+        let script = document.createElement("script");
+        script.onload = function()
+        {
+            tempNodes = __nodes["nodes"];
+            tempChannels = __nodes["edges"];
+    
+            Resized();
+            CalculateNodeData();
+            CalculateNodePositions();
+            RenderTexts();
+            CalculateLines();
+            WebglInit();
+            let loadingOverlayStyle = document.getElementById("loading_overlay").style;
+            loadingOverlayStyle.opacity = "0";
+    
+            window.setTimeout(function()
+            {
+                loadingOverlayStyle.display = "none";
+            }, 300);
+        };
+        script.src = "graph.js";
+        document.getElementsByTagName("body")[0].appendChild(script);
+    }
+    else
     {
-        if (ev.target.readyState != 4 || (ev.target.status != 200 && ev.target.status != 0))
+        let request  = new XMLHttpRequest();
+
+        let errorFunction = function()
         {
-            errorFunction();
-            return;
-        }
+            let loadingText = document.getElementById("loading_text");
+            loadingText.innerHTML = "Loading error, see console for details";
+            loadingText.style.fontSize = "10vh";
+        };
 
-        let responseData = JSON.parse(ev.target.responseText);
-
-        tempNodes = responseData["nodes"];
-        tempChannels = responseData["edges"];
-
-        Resized();
-        CalculateNodeData();
-        CalculateNodePositions();
-        RenderTexts();
-        CalculateLines();
-        WebglInit();
-        let loadingOverlayStyle = document.getElementById("loading_overlay").style;
-        loadingOverlayStyle.opacity = "0";
-
-        window.setTimeout(function()
+        request.onload = function(ev)
         {
-            loadingOverlayStyle.display = "none";
-        }, 300);
-    };
+            if (ev.target.readyState != 4 || (ev.target.status != 200 && ev.target.status != 0))
+            {
+                errorFunction();
+                return;
+            }
 
-    request.onerror = errorFunction;
+            let responseData = JSON.parse(ev.target.responseText);
 
-    request.open("GET", "https://rompert.com/networkgraphv2", true);
-    request.send();
+            tempNodes = responseData["nodes"];
+            tempChannels = responseData["edges"];
+
+            Resized();
+            CalculateNodeData();
+            CalculateNodePositions();
+            RenderTexts();
+            CalculateLines();
+            WebglInit();
+            let loadingOverlayStyle = document.getElementById("loading_overlay").style;
+            loadingOverlayStyle.opacity = "0";
+
+            window.setTimeout(function()
+            {
+                loadingOverlayStyle.display = "none";
+            }, 300);
+        };
+
+        request.onerror = errorFunction;
+
+        request.open("GET", "https://rompert.com/networkgraphv2", true);
+        request.send();
+    }
 }
 
 window.addEventListener("resize", Resized);
 window.addEventListener("load", PageLoaded);
-window.oncontextmenu = function() { return false; }
 
 let isCameraDragging = false;
-let dragged = false;
+let dragged = false; // <-- true if the camera was actually moved
 let isNodeDragging = false;
+let interactLocked = false;
 let draggedNode = undefined;
-let nodeDragStartX = 0, nodeDragStartY;
+let nodeDragStartX = 0, nodeDragStartY = 0;
 canvas.addEventListener("mousedown", function(ev)
 {
+    ev.preventDefault();
+
+    if (interactLocked)
+        return;
+    
     if (ev.button === 2)
         isCameraDragging = true;
     else if (ev.button === 0)
@@ -98,41 +131,48 @@ canvas.addEventListener("mousedown", function(ev)
         let clickedNode = GetNodeFromMousePos(ev.clientX, ev.clientY);
         if (clickedNode)
         {
+            SelectNode(clickedNode, false);
             isNodeDragging = true;
             draggedNode = clickedNode;
             nodeDragStartX = clickedNode["renderData"]["posX"];
-            nodeDragStartY = clickedNode["renderData"]["posy"];
+            nodeDragStartY = clickedNode["renderData"]["posY"];
+        }
+        else
+        {
+            DeselectNode();
         }
     }
 
 });
 window.addEventListener("mouseup", function(ev)
 {
+    if (interactLocked)
+        return;
+    
     if (ev.button === 2)
     {
         isCameraDragging = false;
 
-        if (!dragged)
-        {
-            let clickedNode = GetNodeFromMousePos(ev.clientX, ev.clientY);
-            if (clickedNode)
-                console.log("clicked node: " + clickedNode["alias"]);
-        }
+        //if (!dragged)
+        //{
+        //    let clickedNode = GetNodeFromMousePos(ev.clientX, ev.clientY);
+        //    if (clickedNode)
+        //        console.log("clicked node: " + clickedNode["alias"]);
+        //}
 
         dragged = false;
     }
     else if (ev.button === 0)
     {
         if (isNodeDragging)
-        {
             EndDraggingNode(draggedNode);
-            isNodeDragging = false;
-            draggedNode = undefined;
-        }
     }
 });
 window.addEventListener("mousemove", function(ev)
 {
+    if (interactLocked)
+        return;
+
     if (isCameraDragging)
     {
         dragged = true;
@@ -143,6 +183,9 @@ window.addEventListener("mousemove", function(ev)
 });
 canvas.addEventListener("wheel", function(ev)
 {
+    if (interactLocked)
+        return;
+    
     // positive: zoom out, negative: zoom in
     let prevZoom = zoom;
     if (ev.deltaY > 0)
@@ -221,6 +264,12 @@ function DragNode(node, dx, dy)
 
 function EndDraggingNode(node)
 {
+    isNodeDragging = false;
+    draggedNode = undefined;
+
+    if (!node)
+        return;
+
     // update grid if needed
     let nodeRenderData = node["renderData"];
     let prevX = nodeDragStartX, prevY = nodeDragStartY;
@@ -278,6 +327,64 @@ function EndDraggingNode(node)
     }
 }
 
+function MoveToNode(node)
+{
+    isCameraDragging = false;
+    EndDraggingNode();
+    interactLocked = true;
+
+    let startZoom = zoom;
+    let targetZoom = 1;
+
+    let targetPosX = node["renderData"]["posX"] - windowWidth * 0.5 + node["renderData"]["textWidth"] * 0.5 + textPaddingX;
+    let targetPosY = node["renderData"]["posY"] - windowHeight * 0.5 + (boxSizeY + boxHeight * 0.5);
+    let startPosX = -cameraOffsetX, startPosY = cameraOffsetY;
+    const steps = 50;
+    let currentStepMove = 0;
+    let currentStepZoom = -1;
+
+
+    function Update()
+    {
+        if (currentStepMove != steps)
+        {
+            let percent = currentStepMove / steps;
+            let t = Math.sin((percent - 0.5) * Math.PI) * 0.5 + 0.5;
+            
+            cameraOffsetX = -(startPosX + (targetPosX - startPosX) * t);
+            cameraOffsetY = startPosY + (targetPosY - startPosY) * t;
+
+            if (++currentStepMove == 40)
+            {
+                if (Math.abs(startZoom - targetZoom) < 0.001)
+                    currentStepZoom = steps;
+                else
+                    currentStepZoom = 0;
+            }
+        }
+
+        if (currentStepZoom != -1 && currentStepZoom != steps)
+        {
+            let percent = currentStepZoom / steps;
+            let t = Math.sin((percent - 0.5) * Math.PI) * 0.5 + 0.5;
+            
+            zoom = startZoom + (targetZoom - startZoom) * t;
+
+            ++currentStepZoom;
+        }
+        
+        ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
+        Changed();
+
+        if (currentStepZoom == steps && currentStepMove == steps)
+            interactLocked = false;
+        else
+            window.requestAnimationFrame(Update);
+    }
+
+    Update();
+}
+
 function GetNodeFromMousePos(x, y)
 {
     let startX = windowWidth * 0.5 - windowWidth * 0.5 / zoom;
@@ -294,7 +401,6 @@ function GetNodeFromMousePos(x, y)
     let currentGridElements = grid[gridX + " " + gridY];
     if (currentGridElements !== undefined)
     {
-        let foundNode = undefined;
         for (let node in currentGridElements)
         {
             let currentNodeData = currentGridElements[node]["renderData"];
@@ -314,6 +420,7 @@ function GetNodeFromMousePos(x, y)
 const allNodes = {};
 const allNodesByIndex = [];
 const allChannels = {};
+const allChannelsByIndex = [];
 let tempNodes, tempChannels;
 let allNodeCount = 0;
 let allChannelCount = 0;
@@ -335,7 +442,23 @@ function CalculateNodeData()
             currentNode.renderData["order"] = allNodeCount;
 
             if (currentNode["alias"] === "")
-                currentNode["alias"] = pubkey.substr(0, 10) + "...";
+            {
+                currentNode["alias"] = pubkey.substr(0, 12);
+                currentNode["hasNoAlias"] = true;
+            }
+
+            nodeSearchData[currentNode["alias"].toLowerCase()] = currentNode;
+
+            // enabling this will allow searching for pubkeys and addresses
+
+            //nodeSearchData[pubkey] = currentNode;
+            //
+            //let addresses = currentNode["addresses"];
+            //if (addresses)
+            //{
+            //    for (let j = 0; j < addresses.length; ++j)
+            //        nodeSearchData[addresses[j]["addr"]] = currentNode;
+            //}
 
             currentNode.renderData["textWidth"] = tctx.measureText(currentNode["alias"]).width;
             ++allNodeCount;
@@ -357,6 +480,9 @@ function CalculateNodeData()
             allNodes[node1].channels[channelId] = currentChannel;
             allNodes[node2].channels[channelId] = currentChannel;
             allChannels[channelId] = currentChannel;
+
+            allChannelsByIndex[allChannelCount] = currentChannel;
+            currentChannel["order"] = allChannelCount;
             ++allChannelCount;
         }
     }
@@ -545,9 +671,9 @@ const lineAlpha = 1;
 function CalculateLineColors(colorBufferData)
 {
     let colorBufferIndex = 0;
-    for (let ch in allChannels)
+    for (let i = 0; i < allChannelCount; ++i)
     {
-        let currentChannel = allChannels[ch];
+        let currentChannel = allChannelsByIndex[i];
 
         let color1 = allNodes[currentChannel["node1_pub"]]["color"];
         let color2 = allNodes[currentChannel["node2_pub"]]["color"];
@@ -583,23 +709,17 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 {
     let offsetBufferData = lineData.offsetBufferData;
     let addY = boxSizeY * 2 + boxHeight;
-
-    let updateAllNodes = updateOnlyThisNode === undefined;
     
-    let vertexIndex = 0;
+    let currentlyUpdatedChannels = updateOnlyThisNode ? updateOnlyThisNode["channels"] : allChannels;
 
-    for (let ch in allChannels)
+    for (let ch in currentlyUpdatedChannels)
     {
         let currentChannel = allChannels[ch];
 
         let node1 = allNodes[currentChannel["node1_pub"]];
         let node2 = allNodes[currentChannel["node2_pub"]];
         
-        if (!updateAllNodes && node1 != updateOnlyThisNode && node2 != updateOnlyThisNode)
-        {
-            vertexIndex += 24;
-            continue;
-        }
+        let vertexIndex = currentChannel["order"] * 24;
 
         let renderData1 = node1["renderData"], renderData2 = node2["renderData"];
 
@@ -1050,9 +1170,9 @@ function Loaded()
 {
     InitWebglData();
     
-    for (let node in allNodes)
+    for (let i = 0; i < allNodeCount; ++i)
     {
-        let currentNode = allNodes[node];
+        let currentNode = allNodesByIndex[i];
         SetPosition(currentNode.renderData["order"], currentNode.renderData["posX"], currentNode.renderData["posY"]);
     }
 

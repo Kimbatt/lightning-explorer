@@ -32,19 +32,113 @@ body
     align-items: center;
 }
 
+.search_result_element
+{
+    display: table;
+    font-size: 20px;
+    padding: 4px;
+    border: 1px solid white;
+    background: #121316;
+    color: white;
+    width: 100%;
+    text-align: left;
+    transition: background 0.1s linear;
+    outline: none;
+}
+
+.search_result_element:enabled
+{
+    cursor: pointer;
+}
+
+.search_result_element:hover:enabled
+{
+    background: #404040;
+    transition: background 0.1s linear;
+}
+
+#search_results
+{
+    position: absolute;
+    top: 78px;
+    left: 20px;
+    border: 1px solid white;
+    background: #121316;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, visibility 0.2s linear;
+}
+
+#node_details
+{
+    display: table;
+    position: absolute;
+    padding: 5px;
+    left: 10px;
+    border: 2px solid white;
+    background: #121316;
+    overflow: hidden;
+    max-width: 50%;
+}
+
+.node_details_visible
+{
+    bottom: 10px;
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.2s ease-in-out, visibility 0.2s linear, bottom 0.2s ease-out;
+}
+
+.node_details_hidden
+{
+    bottom: -10px;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, visibility 0.2s linear, bottom 0.2s ease-in;
+}
+
+.node_details_label
+{
+    display: inline-block;
+    width: 100px;
+    margin-top: 5px;
+}
+
+.node_details_element
+{
+    display: inline-block;
+}
+
 </style>
 </head>
 <body style="overflow: hidden;">
-<div id="loading_overlay">
+<div id="loading_overlay" oncontextmenu="return false">
     <div id="loading_text" style="font-size: 20vh;">Loading...</div>
 </div>
 
-<div style="user-select: none; position: absolute; top: 10px; right: 10px; padding: 6px; background-color: #323639; color: white; border: 2px solid white;">
+<div style="user-select: none; position: absolute; top: 10px; right: 10px; padding: 6px; background: #121316; color: white; border: 2px solid white;">
     <div>Drag camera with right click</div>
     <div style="margin-top: 5px;">Select and drag nodes with left click</div>
 </div>
 
-<canvas id="canvas" style="position: absolute; top: 0px; left: 0px; z-index: -1;"></canvas>
+<div style="position: absolute; top: 10px; left: 10px; padding: 6px; background: #121316; color: white; border: 2px solid white;">
+    <div style="font-size: 20px;">Search</div>
+    <input type="text" oninput="UpdateSearchResults(event)" onfocus="UpdateSearchResults(event)" onblur="SearchStop()" style="background: #121316; color: white; border: 1px solid #a0a3a1; padding: 3px; font-size: 20px; margin-top: 5px;">
+</div>
+
+<div id="search_results"></div>
+<div id="node_details" class="node_details_hidden">
+    <div style="font-size: 20px; margin-bottom: 10px;">Node information</div>
+    <div class="node_details_label">Name:</div><div class="node_details_element" id="node_details_alias">asdfasdfasdfasdfasdf</div>
+    <br>
+    <div class="node_details_label">Public key:</div><div class="node_details_element" id="node_details_pubkey">0200072fd301cb4a680f26d87c28b705ccd6a1d5b00f1b5efd7fe5f998f1bbb1f1</div>
+    <br>
+    <div class="node_details_label">IP address:</div><div class="node_details_element" id="node_details_ip">123.123.123.123</div>
+</div>
+
+<canvas id="canvas" style="position: absolute; top: 0px; left: 0px; z-index: -1;" oncontextmenu="return false"></canvas>
+
 <script src="main.js"></script>
+<script src="UI.js"></script>
 </body>
 </html>
