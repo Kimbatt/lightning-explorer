@@ -8,6 +8,8 @@ const tctx = textCanvas.getContext("2d");
 //textCanvas.style = "border: 2px solid red; z-index: 1;";
 const baseFontSize = 48;
 
+const coordMultiplier = 1; // for increased precision
+
 let windowWidth, windowHeight, windowWidthInverse, windowHeightInverse;
 let prevWindowWidth = 0, prevWindowHeight = 0;
 function Resized()
@@ -65,12 +67,18 @@ function PageLoaded()
     else
     {
         let request  = new XMLHttpRequest();
+        
+        let textDiv = document.getElementById("loading_text2");
+        request.onprogress = function(ev)
+        {
+            textDiv.innerHTML = (ev.loaded / 1048576).toFixed(1) + "MB loaded";
+        };
 
         let errorFunction = function()
         {
             let loadingText = document.getElementById("loading_text");
-            loadingText.innerHTML = "Loading error, see console for details";
-            loadingText.style.fontSize = "10vh";
+            loadingText.innerHTML = "Error";
+            textDiv.innerHTML = "See console for details";
         };
 
         request.onload = function(ev)
@@ -81,30 +89,37 @@ function PageLoaded()
                 return;
             }
 
-            let responseData = JSON.parse(ev.target.responseText);
-
-            tempNodes = responseData["nodes"];
-            tempChannels = responseData["edges"];
-
-            Resized();
-            CalculateNodeData();
-            CalculateNodePositions();
-            RenderTexts();
-            CalculateLines();
-            WebglInit();
-            let loadingOverlayStyle = document.getElementById("loading_overlay").style;
-            loadingOverlayStyle.opacity = "0";
-
-            window.setTimeout(function()
+            window.requestAnimationFrame(function()
             {
-                loadingOverlayStyle.display = "none";
-            }, 300);
+                textDiv.innerHTML = "Processing data...";
+                window.requestAnimationFrame(function()
+                {
+                    let responseData = JSON.parse(ev.target.responseText);
+
+                    tempNodes = responseData["nodes"];
+                    tempChannels = responseData["edges"];
+                    Resized();
+                    CalculateNodeData();
+                    CalculateNodePositions();
+                    RenderTexts();
+                    CalculateLines();
+                    WebglInit();
+                    let loadingOverlayStyle = document.getElementById("loading_overlay").style;
+                    loadingOverlayStyle.opacity = "0";
+
+                    window.setTimeout(function()
+                    {
+                        loadingOverlayStyle.display = "none";
+                    }, 300);
+                });
+            });
         };
 
         request.onerror = errorFunction;
 
         request.open("GET", "https://rompert.com/networkgraphv2", true);
         request.send();
+        console.log("start");
     }
 }
 
@@ -193,10 +208,10 @@ canvas.addEventListener("wheel", function(ev)
     else
         zoom *= 1.05;
 
-    if (zoom > 100)
-        zoom = 100;
-    else if (zoom < 0.001)
-        zoom = 0.001;
+    if (zoom > maxZoom)
+        zoom = maxZoom;
+    else if (zoom < minZoom)
+        zoom = minZoom;
     
     cameraOffsetX += (windowWidth * 0.5 - ev.clientX) * (1 / prevZoom - 1 / zoom);
     cameraOffsetY += (windowHeight * 0.5 - ev.clientY) * (1 / zoom - 1 / prevZoom);
@@ -243,7 +258,7 @@ function DragNode(node, dx, dy)
 
     // update text position
     let currentOffsetX = posX;
-    let currentOffsetY = posY - baseFontSize * 2 - textPaddingY * 2 - 30;
+    let currentOffsetY = posY - (baseFontSize * 2 + textPaddingY * 2 + 30) * coordMultiplier;
 
     let startIndex2 = nodeRenderData["atlasIndex"];
     let textOffsetBufferData = textAtlases[nodeRenderData["atlasID"]]["offsetBufferData"];
@@ -276,11 +291,11 @@ function EndDraggingNode(node)
 
     let posX = nodeRenderData["posX"], posY = nodeRenderData["posY"];
 
-    let prevEndPosX = prevX + boxSizeX * 2 + nodeRenderData["textWidth"];
-    let prevEndPosY = prevY + boxSizeY * 2 + boxHeight;
+    let prevEndPosX = prevX + boxSizeX * 2 * coordMultiplier + nodeRenderData["textWidth"];
+    let prevEndPosY = prevY + (boxSizeY * 2 + boxHeight) * coordMultiplier;
 
-    let newEndPosX = posX + boxSizeX * 2 + nodeRenderData["textWidth"];
-    let newEndPosY = posY + boxSizeY * 2 + boxHeight;
+    let newEndPosX = posX + boxSizeX * 2 * coordMultiplier + nodeRenderData["textWidth"];
+    let newEndPosY = posY + (boxSizeY * 2 + boxHeight) * coordMultiplier;
 
     let prevGridStartX = (prevX >> gridSize),
         prevGridStartY = (prevY >> gridSize),
@@ -334,19 +349,26 @@ function MoveToNode(node)
     interactLocked = true;
 
     let startZoom = zoom;
-    let targetZoom = 1;
+    let targetZoom = 1 / coordMultiplier;
 
-    let targetPosX = node["renderData"]["posX"] - windowWidth * 0.5 + node["renderData"]["textWidth"] * 0.5 + textPaddingX;
-    let targetPosY = node["renderData"]["posY"] - windowHeight * 0.5 + (boxSizeY + boxHeight * 0.5);
+    let targetPosX = node["renderData"]["posX"] + (-windowWidth * 0.5 + node["renderData"]["textWidth"] * 0.5 + textPaddingX) * coordMultiplier;
+    let targetPosY = node["renderData"]["posY"] + (-windowHeight * 0.5 + (boxSizeY + boxHeight * 0.5)) * coordMultiplier;
     let startPosX = -cameraOffsetX, startPosY = cameraOffsetY;
+    
     const steps = 50;
     let currentStepMove = 0;
     let currentStepZoom = -1;
 
+    const coordThreshold = 0.1 / coordMultiplier;
+    if (Math.abs(targetPosX - startPosX) < coordThreshold && Math.abs(targetPosY - startPosY) < coordThreshold)
+        currentStepMove = steps + 1;
+
+    if (Math.abs(startZoom - targetZoom) < 0.01)
+        currentStepZoom = steps + 1;
 
     function Update()
     {
-        if (currentStepMove != steps)
+        if (currentStepMove <= steps)
         {
             let percent = currentStepMove / steps;
             let t = Math.sin((percent - 0.5) * Math.PI) * 0.5 + 0.5;
@@ -356,14 +378,12 @@ function MoveToNode(node)
 
             if (++currentStepMove == 40)
             {
-                if (Math.abs(startZoom - targetZoom) < 0.001)
-                    currentStepZoom = steps;
-                else
+                if (currentStepZoom == -1)
                     currentStepZoom = 0;
             }
         }
 
-        if (currentStepZoom != -1 && currentStepZoom != steps)
+        if (currentStepZoom != -1 && currentStepZoom <= steps)
         {
             let percent = currentStepZoom / steps;
             let t = Math.sin((percent - 0.5) * Math.PI) * 0.5 + 0.5;
@@ -372,14 +392,14 @@ function MoveToNode(node)
 
             ++currentStepZoom;
         }
-        
-        ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
-        Changed();
 
-        if (currentStepZoom == steps && currentStepMove == steps)
+        if (currentStepZoom > steps && currentStepMove > steps)
             interactLocked = false;
         else
             window.requestAnimationFrame(Update);
+        
+        ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
+        Changed();
     }
 
     Update();
@@ -387,15 +407,15 @@ function MoveToNode(node)
 
 function GetNodeFromMousePos(x, y)
 {
-    let startX = windowWidth * 0.5 - windowWidth * 0.5 / zoom;
-    let endX = windowWidth * 0.5 + windowWidth * 0.5 / zoom;
+    let startX = (windowWidth * 0.5 - windowWidth * 0.5 / (zoom * coordMultiplier));
+    let endX = (windowWidth * 0.5 + windowWidth * 0.5 / (zoom * coordMultiplier));
     let percentX = x / windowWidth;
-    let posX = (endX - startX) * percentX + startX - cameraOffsetX;
+    let posX = ((endX - startX) * percentX + startX) * coordMultiplier - cameraOffsetX;
 
-    let startY = windowHeight * 0.5 - windowHeight * 0.5 / zoom;
-    let endY = windowHeight * 0.5 + windowHeight * 0.5 / zoom;
+    let startY = (windowHeight * 0.5 - windowHeight * 0.5 / (zoom * coordMultiplier));
+    let endY = (windowHeight * 0.5 + windowHeight * 0.5 / (zoom * coordMultiplier));
     let percentY = y / windowHeight;
-    let posY = (endY - startY) * percentY + startY + cameraOffsetY;
+    let posY = ((endY - startY) * percentY + startY) * coordMultiplier + cameraOffsetY;
 
     let gridX = posX >> gridSize, gridY = posY >> gridSize;
     let currentGridElements = grid[gridX + " " + gridY];
@@ -406,8 +426,8 @@ function GetNodeFromMousePos(x, y)
             let currentNodeData = currentGridElements[node]["renderData"];
             
             let startPosX = currentNodeData["posX"], startPosY = currentNodeData["posY"];
-            let endPosX = startPosX + textPaddingX * 2 + currentNodeData["textWidth"];
-            let endPosY = startPosY + boxSizeY * 2 + boxHeight;
+            let endPosX = startPosX + (textPaddingX * 2 + currentNodeData["textWidth"]) * coordMultiplier;
+            let endPosY = startPosY + (boxSizeY * 2 + boxHeight) * coordMultiplier;
             
             if (startPosY < posY && endPosY > posY && startPosX < posX && endPosX > posX)
                 return currentGridElements[node];
@@ -489,10 +509,10 @@ function CalculateNodeData()
 };
 
 const grid = {};
-const gridSize = 12; // 2^gridSize
+const gridSize = 4; // 2^gridSize
 function CalculateNodePositions()
 {
-    const circleSize = 40000;
+    const circleSize = 40000 * coordMultiplier;
     for (let i = 0; i < allNodeCount; ++i)
     {
         let currentNode = allNodesByIndex[i];
@@ -501,10 +521,9 @@ function CalculateNodePositions()
         currentNode.renderData["posY"] = Math.sin(i / allNodeCount * Math.PI * 2) * circleSize;
     }
 
-    const target = 5000;
+    const target = 5000 * coordMultiplier;
 
-    // 50 iterations should be enough
-    for (let c = 0; c < 100; ++c)
+    for (let c = 0; c < 20; ++c)
     {
         let newPositions = new Array(allNodeCount);
         for (let i = 0; i < allNodeCount; ++i)
@@ -566,8 +585,8 @@ function CalculateNodePositions()
         let renderData = currentNode["renderData"];
         let posX = renderData["posX"], posY = renderData["posY"];
 
-        let endPosX = posX + boxSizeX * 2 + renderData["textWidth"];
-        let endPosY = posY + boxSizeY * 2 + boxHeight;
+        let endPosX = posX + (boxSizeX * 2 + renderData["textWidth"]) * coordMultiplier;
+        let endPosY = posY + (boxSizeY * 2 + boxHeight) * coordMultiplier;
 
         let gridStartX = (posX >> gridSize),
             gridStartY = (posY >> gridSize),
@@ -704,11 +723,11 @@ function CalculateLineColors(colorBufferData)
     }
 }
 
-const lineWidth = 2;
+const lineWidth = 2 * coordMultiplier;
 function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfTheFuckingLines(updateOnlyThisNode)
 {
     let offsetBufferData = lineData.offsetBufferData;
-    let addY = boxSizeY * 2 + boxHeight;
+    let addY = (boxSizeY * 2 + boxHeight) * coordMultiplier;
     
     let currentlyUpdatedChannels = updateOnlyThisNode ? updateOnlyThisNode["channels"] : allChannels;
 
@@ -724,14 +743,14 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
         let renderData1 = node1["renderData"], renderData2 = node2["renderData"];
 
         let startPosX1 = renderData1["posX"], startPosY1 = renderData1["posY"];
-        let endPosX1 = startPosX1 + boxSizeX * 2 + renderData1["textWidth"];
+        let endPosX1 = startPosX1 + (boxSizeX * 2 + renderData1["textWidth"]) * coordMultiplier;
         let endPosY1 = startPosY1 + addY;
 
         let posX1 = (endPosX1 - startPosX1) * 0.5 + startPosX1;
         let posY1 = (endPosY1 - startPosY1) * 0.5 + startPosY1;
         
         let startPosX2 = renderData2["posX"], startPosY2 = renderData2["posY"];
-        let endPosX2 = startPosX2 + boxSizeX * 2 + renderData2["textWidth"];
+        let endPosX2 = startPosX2 + (boxSizeX * 2 + renderData2["textWidth"]) * coordMultiplier;
         let endPosY2 = startPosY2 + addY;
 
         let posX2 = (endPosX2 - startPosX2) * 0.5 + startPosX2;
@@ -741,20 +760,20 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 
         let sin = Math.sin(angle), cos = Math.cos(angle);
         // bottom right
-        let x1 = (posX1 + lineWidth * sin) * 2 - windowWidth;
-        let y1 = (posY1 - lineWidth * cos) * -2 + windowHeight;
+        let x1 = (posX1 + lineWidth * sin) * 2 - windowWidth * coordMultiplier;
+        let y1 = (posY1 - lineWidth * cos) * -2 + windowHeight * coordMultiplier;
         
         // top right
-        let x3 = (posX2 + lineWidth * sin) * 2 - windowWidth;
-        let y3 = (posY2 - lineWidth * cos) * -2 + windowHeight;
+        let x3 = (posX2 + lineWidth * sin) * 2 - windowWidth * coordMultiplier;
+        let y3 = (posY2 - lineWidth * cos) * -2 + windowHeight * coordMultiplier;
         
         // bottom left
-        let x2 = (posX1 - lineWidth * sin) * 2 - windowWidth;
-        let y2 = (posY1 + lineWidth * cos) * -2 + windowHeight;
+        let x2 = (posX1 - lineWidth * sin) * 2 - windowWidth * coordMultiplier;
+        let y2 = (posY1 + lineWidth * cos) * -2 + windowHeight * coordMultiplier;
         
         // top left
-        let x4 = (posX2 - lineWidth * sin) * 2 - windowWidth;
-        let y4 = (posY2 + lineWidth * cos) * -2 + windowHeight;
+        let x4 = (posX2 - lineWidth * sin) * 2 - windowWidth * coordMultiplier;
+        let y4 = (posY2 + lineWidth * cos) * -2 + windowHeight * coordMultiplier;
 
         // bottom middle
         let x5 = x1 + (x3 - x1) * 0.5;
@@ -1005,8 +1024,8 @@ function RenderTexts()
     let offsetData = [];
     let colorData = [];
     
-    let left = textPaddingX * windowWidthInverse * 2 - 1;
-    let bottom = 1;
+    let left = (textPaddingX * windowWidthInverse * 2 - 1) * coordMultiplier;
+    let bottom = 1 * coordMultiplier;
     
     for (let i = 0; i < allNodeCount; ++i)
     {
@@ -1043,8 +1062,8 @@ function RenderTexts()
 
         tctx.fillText(currentText, offsetX, offsetY);
 
-        let top = height * windowHeightInverse * 2 + 1;
-        let right = (width + textPaddingX) * windowWidthInverse * 2 - 1;
+        let top = (height * windowHeightInverse * 2 + 1) * coordMultiplier;
+        let right = ((width + textPaddingX) * windowWidthInverse * 2 - 1) * coordMultiplier;
 
         vertexData.push(left);
         vertexData.push(bottom);
@@ -1080,7 +1099,7 @@ function RenderTexts()
         uvData.push(uvBottom);
 
         let currentOffsetX = currentNode["renderData"]["posX"] * 2;
-        let currentOffsetY = -currentNode["renderData"]["posY"] * 2 - baseFontSize * 2 - textPaddingY * 2 - 30;
+        let currentOffsetY = -currentNode["renderData"]["posY"] * 2 - (baseFontSize * 2 + textPaddingY * 2 + 30) * coordMultiplier;
         for (let j = 0; j < 6; ++j)
         {
             offsetData.push(currentOffsetX);
@@ -1126,8 +1145,8 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
     let distY = baseFontSize * 0.75;
     let height = baseFontSize + distY;
 
-    let left = textPaddingX * windowWidthInverse * 2 - 1;
-    let bottom = 1;
+    let left = (textPaddingX * windowWidthInverse * 2 - 1) * coordMultiplier;
+    let bottom = 1 * coordMultiplier;
     
     let index = 0;
     for (let i = 0; i < textAtlasCount; ++i)
@@ -1141,8 +1160,8 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
             let width = allNodesByIndex[index]["renderData"]["textPosition"]["w"];
             ++index;
 
-            let top = height * windowHeightInverse * 2 + 1;
-            let right = (width + textPaddingX) * windowWidthInverse * 2 - 1;
+            let top = (height * windowHeightInverse * 2 + 1) * coordMultiplier;
+            let right = ((width + textPaddingX) * windowWidthInverse * 2 - 1) * coordMultiplier;
 
             vertexData.push(left);
             vertexData.push(bottom);
@@ -1222,7 +1241,7 @@ function SetPosition(index, x, y)
     }
 
     let currentOffsetX = x * 2;
-    let currentOffsetY = -y * 2 - baseFontSize * 2 - textPaddingY * 2 - 30;
+    let currentOffsetY = -y * 2 - (baseFontSize * 2 + textPaddingY * 2 + 30) * coordMultiplier;
 
     let startIndex2 = currentNode["renderData"]["atlasIndex"];
     for (let i = 0; i < 6; ++i)
@@ -1257,21 +1276,21 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
     let vertices = new Float32Array(count * 12 * 9);
     let vertexIndex = 0;
 
-    let left0 = -1;
-    let left1 = left0 + boxSizeX * 2 * windowWidthInverse;
+    let left0 = -1 * coordMultiplier;
+    let left1 = left0 + (boxSizeX * 2 * windowWidthInverse) * coordMultiplier;
     
-    let bottom0 = 1;
-    let bottom1 = bottom0 - boxSizeY * windowHeightInverse * 2;
-    let bottom2 = bottom0 - (boxSizeY + boxHeight) * windowHeightInverse * 2;
-    let bottom3 = bottom0 - (boxSizeY * 2 + boxHeight) * windowHeightInverse * 2;
+    let bottom0 = 1 * coordMultiplier;
+    let bottom1 = bottom0 - boxSizeY * windowHeightInverse * 2 * coordMultiplier;
+    let bottom2 = bottom0 - (boxSizeY + boxHeight) * windowHeightInverse * 2 * coordMultiplier;
+    let bottom3 = bottom0 - (boxSizeY * 2 + boxHeight) * windowHeightInverse * 2 * coordMultiplier;
 
     let widthAddPrecalc = textPaddingX * 2 - boxSizeX * 2;
     
     for (let i = 0; i < count; ++i)
     {
         let currentNodeTextWidth = allNodesByIndex[i].renderData["textWidth"] + widthAddPrecalc;
-        let left2 = left0 + (boxSizeX + currentNodeTextWidth) * 2 * windowWidthInverse;
-        let left3 = left0 + (boxSizeX * 2 + currentNodeTextWidth) * 2 * windowWidthInverse;
+        let left2 = left0 + (boxSizeX + currentNodeTextWidth) * 2 * windowWidthInverse * coordMultiplier;
+        let left3 = left0 + (boxSizeX * 2 + currentNodeTextWidth) * 2 * windowWidthInverse * coordMultiplier;
 
         // top left
         vertices[vertexIndex++] = left0;
@@ -1417,7 +1436,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
     ctx.uniform2f(windowSizeLoc, windowWidthInverse, windowHeightInverse);
 }
 
-let zoom = 0.0625;
+let zoom = 0.125 / coordMultiplier;
+const maxZoom = zoom * 1000, minZoom = zoom * 0.001;
+
 let vertexOffsets;
 function InitWebglData()
 {
@@ -1571,8 +1592,13 @@ function InitWebglData()
         uvs[uvIndex++] = uvLeft;
         uvs[uvIndex++] = uvTop;
 
-        for (let j = 0; j < 216; ++j)
+        for (let j = 0; j < 216; j += 4)
+        {
             colors[colorIndex++] = 1;
+            colors[colorIndex++] = 1;
+            colors[colorIndex++] = 1;
+            colors[colorIndex++] = 1;
+        }
     }
 
     //ctx.enableVertexAttribArray(tLoc);

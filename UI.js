@@ -23,15 +23,11 @@ function UpdateSearchResults(ev)
 
     if (pattern === "")
     {
-        searchResultsDiv.style.opacity = "0";
-        searchResultsDiv.style.visibility = "hidden";
+        searchResultsDiv.className = "search_results_hidden";
         return;
     }
     else
-    {
-        searchResultsDiv.style.opacity = "1";
-        searchResultsDiv.style.visibility = "visible";
-    }
+        searchResultsDiv.className = "search_results_visible";
 
     let results = Search(pattern);
     let keys = Object.keys(results);
@@ -154,8 +150,7 @@ function Search(pattern)
 
 function SearchStop()
 {
-    searchResultsDiv.style.opacity = "0";
-    searchResultsDiv.style.visibility = "hidden";
+    searchResultsDiv.className = "search_results_hidden";
 }
 
 function SelectNode(selectedNode, doMoveToNode)

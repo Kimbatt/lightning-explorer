@@ -28,6 +28,7 @@ body
     background-color: black;
     transition: opacity 0.3s linear;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
 }
@@ -64,9 +65,19 @@ body
     left: 20px;
     border: 1px solid white;
     background: #121316;
+    transition: opacity 0.2s ease-in-out, visibility 0.2s linear;
+}
+
+.search_results_visible
+{
+    visibility: visible;
+    opacity: 1;
+}
+
+.search_results_hidden
+{
     visibility: hidden;
     opacity: 0;
-    transition: opacity 0.2s ease-in-out, visibility 0.2s linear;
 }
 
 #node_details
@@ -114,6 +125,7 @@ body
 <body style="overflow: hidden;">
 <div id="loading_overlay" oncontextmenu="return false">
     <div id="loading_text" style="font-size: 20vh;">Loading...</div>
+    <div id="loading_text2" style="font-size: 10vh; margin-top: 10vh;">Loading node data...</div>
 </div>
 
 <div style="user-select: none; position: absolute; top: 10px; right: 10px; padding: 6px; background: #121316; color: white; border: 2px solid white;">
@@ -126,7 +138,7 @@ body
     <input type="text" oninput="UpdateSearchResults(event)" onfocus="UpdateSearchResults(event)" onblur="SearchStop()" style="background: #121316; color: white; border: 1px solid #a0a3a1; padding: 3px; font-size: 20px; margin-top: 5px;">
 </div>
 
-<div id="search_results"></div>
+<div id="search_results" class="search_results_hidden"></div>
 <div id="node_details" class="node_details_hidden">
     <div style="font-size: 20px; margin-bottom: 10px;">Node information</div>
     <div class="node_details_label">Name:</div><div class="node_details_element" id="node_details_alias">asdfasdfasdfasdfasdf</div>
