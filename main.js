@@ -8,7 +8,7 @@ const tctx = textCanvas.getContext("2d");
 //textCanvas.style = "border: 2px solid red; z-index: 1;";
 const baseFontSize = 48;
 
-const coordMultiplier = 1; // for increased precision
+const coordMultiplier = 1; // reduce this for increased precision
 
 let windowWidth, windowHeight, windowWidthInverse, windowHeightInverse;
 let prevWindowWidth = 0, prevWindowHeight = 0;
@@ -119,7 +119,6 @@ function PageLoaded()
 
         request.open("GET", "https://rompert.com/networkgraphv2", true);
         request.send();
-        console.log("start");
     }
 }
 
@@ -441,6 +440,7 @@ const allNodes = {};
 const allNodesByIndex = [];
 const allChannels = {};
 const allChannelsByIndex = [];
+let allNodesSortedByChannelCount;
 let tempNodes, tempChannels;
 let allNodeCount = 0;
 let allChannelCount = 0;
@@ -506,11 +506,73 @@ function CalculateNodeData()
             ++allChannelCount;
         }
     }
+
+    for (let i = 0; i < allNodeCount; ++i)
+    {
+        let currentNode = allNodesByIndex[i];
+        currentNode["channelCount"] = Object.keys(currentNode.channels).length;
+    }
+
+    allNodesSortedByChannelCount = allNodesByIndex.slice();
+    allNodesSortedByChannelCount.sort(function(a, b)
+    {
+        return b["channelCount"] - a["channelCount"];
+    });
 };
 
 const grid = {};
 const gridSize = 4; // 2^gridSize
 function CalculateNodePositions()
+{
+    const coils = 100;
+    const step = allNodeCount * 50 / (coils * 2 * Math.PI);
+    const maxDist = 2000;
+    const distanceMultiplier = 0.5;
+
+    let theta = maxDist / step;
+
+    for (let i = 0; i < allNodeCount; ++i)
+    {
+        let currentNode = allNodesSortedByChannelCount[i];
+
+        let dist = step * theta;
+        let around = theta;
+        let posX = Math.cos(around) * dist * distanceMultiplier, posY = Math.sin(around) * dist * distanceMultiplier;
+
+        theta += maxDist / dist;
+
+        let renderData = currentNode["renderData"];
+        renderData["posX"] = posX;
+        renderData["posY"] = posY;
+
+        let endPosX = posX + (boxSizeX * 2 + renderData["textWidth"]) * coordMultiplier;
+        let endPosY = posY + (boxSizeY * 2 + boxHeight) * coordMultiplier;
+
+        let gridStartX = (posX >> gridSize),
+            gridStartY = (posY >> gridSize),
+            gridEndX = (endPosX >> gridSize),
+            gridEndY = (endPosY >> gridSize);
+
+        for (let x = gridStartX; x <= gridEndX; ++x)
+        {
+            for (let y = gridStartY; y <= gridEndY; ++y)
+            {
+                let gridKey = x + " " + y;
+
+                let currentGridElements = grid[gridKey];
+                if (currentGridElements === undefined)
+                {
+                    currentGridElements = {};
+                    grid[gridKey] = currentGridElements;
+                }
+
+                currentGridElements[currentNode["pub_key"]] = currentNode;
+            }
+        }
+    }
+}
+
+function CalculateNodePositions2()
 {
     const circleSize = 40000 * coordMultiplier;
     for (let i = 0; i < allNodeCount; ++i)
@@ -564,21 +626,7 @@ function CalculateNodePositions()
             currentNode["renderData"]["posY"] = coord[1];
         }
     }
-    /*
-    for (let i = 0; i < allNodeCount; ++i)
-    {
-        let currentNode = allNodesByIndex[i];
-        let posX = currentNode["renderData"]["posX"], posY = currentNode["renderData"]["posY"];
 
-        let angle = Math.atan2(posY, posX);
-        let cos = Math.cos(angle), sin = Math.sin(angle);
-        posX = cos * (circleSize - posX);
-        posY = sin * (circleSize - posY);
-
-        currentNode["renderData"]["posX"] = posX;
-        currentNode["renderData"]["posY"] = posY;
-    }
-    */    
     for (let i = 0; i < allNodeCount; ++i)
     {
         let currentNode = allNodesByIndex[i];
@@ -1456,7 +1504,7 @@ function InitWebglData()
         for (let j = 0; j < 108; ++j)
             vertexOffsets[vertexOffsetIndices++] = 0;
 
-        let uvLeft = 0, uvRight = 1, uvBottom = 1, uvTop = 0;
+        let uvLeft = 0, uvRight = 0.25, uvBottom = 1, uvTop = 0;
         // top left
         uvs[uvIndex++] = uvLeft;
         uvs[uvIndex++] = uvTop;
@@ -1473,108 +1521,108 @@ function InitWebglData()
         uvs[uvIndex++] = uvBottom;
         
         // top
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.26;
         uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
         
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.26;
         uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.26;
         uvs[uvIndex++] = 1;
         
         // top right
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvLeft;
+        uvs[uvIndex++] = uvRight;
         uvs[uvIndex++] = uvTop;
         uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvBottom;
+        uvs[uvIndex++] = uvTop;
         uvs[uvIndex++] = uvRight;
+        uvs[uvIndex++] = uvBottom;
         
+        uvs[uvIndex++] = uvLeft;
         uvs[uvIndex++] = uvTop;
+        uvs[uvIndex++] = uvRight;
+        uvs[uvIndex++] = uvBottom;
         uvs[uvIndex++] = uvLeft;
         uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvRight;
 
         // left
         uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.99;
+        uvs[uvIndex++] = 0.25;
+        uvs[uvIndex++] = 0.99;
         uvs[uvIndex++] = 0;
         uvs[uvIndex++] = 1;
         
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
+        uvs[uvIndex++] = 0.99;
         uvs[uvIndex++] = 0;
         uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
 
         // center
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
+        uvs[uvIndex++] = 0.99;
+        uvs[uvIndex++] = 0.26;
+        uvs[uvIndex++] = 0.99;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
         
+        uvs[uvIndex++] = 0.25;
+        uvs[uvIndex++] = 0.99;
+        uvs[uvIndex++] = 0.26;
         uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
 
         // right
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 0.9;
         uvs[uvIndex++] = 0;
         uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
         
         uvs[uvIndex++] = 0;
         uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
         uvs[uvIndex++] = 0;
         uvs[uvIndex++] = 1;
 
         // bottom left
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvRight;
+        uvs[uvIndex++] = uvLeft;
         uvs[uvIndex++] = uvBottom;
         uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvTop;
+        uvs[uvIndex++] = uvBottom
         uvs[uvIndex++] = uvLeft;
+        uvs[uvIndex++] = uvTop;
         
+        uvs[uvIndex++] = uvRight;
         uvs[uvIndex++] = uvBottom;
+        uvs[uvIndex++] = uvLeft;
+        uvs[uvIndex++] = uvTop;
         uvs[uvIndex++] = uvRight;
         uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvLeft;
         
         // bottom
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.26;
         uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 0;
         
+        uvs[uvIndex++] = 0.26;
         uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.26;
         uvs[uvIndex++] = 0;
 
         // bottom right
@@ -1601,16 +1649,11 @@ function InitWebglData()
         }
     }
 
-    //ctx.enableVertexAttribArray(tLoc);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, texBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, uvs, ctx.STATIC_DRAW);
-    //ctx.bindTexture(ctx.TEXTURE_2D, texture);
-    //ctx.vertexAttribPointer(tLoc, 2, ctx.FLOAT, false, 0, 0);
 
-    //ctx.enableVertexAttribArray(offsetLoc);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, offsetBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, vertexOffsets, ctx.STATIC_DRAW);
-    //ctx.vertexAttribPointer(offsetLoc, 2, ctx.FLOAT, false, 0, 0);
     
     ctx.bindBuffer(ctx.ARRAY_BUFFER, colorBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, colors, ctx.STATIC_DRAW);
@@ -1722,7 +1765,7 @@ function WebglInit()
     }
 
     texImage.onload = ImageLoaded;
-    texImage.src = "data:image/png;base64,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";
+    texImage.src = "data:image/png;base64,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";
 
     whiteImage.onload = ImageLoaded;
     whiteImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
