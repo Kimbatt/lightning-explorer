@@ -170,11 +170,12 @@ function SelectNode(selectedNode, doMoveToNode)
     let nodeDetailsPubkey = document.getElementById("node_details_pubkey");
     nodeDetailsPubkey.innerHTML = selectedNode["pub_key"];
     
+    let nodeDetailsIP = document.getElementById("node_details_ip");
+
     if (selectedNode["addresses"].length != 0)
-    {
-        let nodeDetailsPubkey = document.getElementById("node_details_ip");
-        nodeDetailsPubkey.innerHTML = selectedNode["addresses"][0]["addr"];
-    }
+        nodeDetailsIP.innerHTML = selectedNode["addresses"][0]["addr"];
+    else
+        nodeDetailsIP.innerHTML = "unknown";
     
     if (doMoveToNode)
         MoveToNode(selectedNode);

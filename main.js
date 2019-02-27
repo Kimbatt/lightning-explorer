@@ -215,7 +215,7 @@ canvas.addEventListener("wheel", function(ev)
     cameraOffsetX += (windowWidth * 0.5 - ev.clientX) * (1 / prevZoom - 1 / zoom);
     cameraOffsetY += (windowHeight * 0.5 - ev.clientY) * (1 / zoom - 1 / prevZoom);
 
-    ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
+    //ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
     Changed();
 });
 
@@ -225,7 +225,7 @@ function CameraDrag(dx, dy)
     cameraOffsetX += dx / zoom;
     cameraOffsetY -= dy / zoom;
     
-    ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
+    //ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
     Changed();
 }
 
@@ -397,7 +397,7 @@ function MoveToNode(node)
         else
             window.requestAnimationFrame(Update);
         
-        ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
+        //ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
         Changed();
     }
 
@@ -663,16 +663,11 @@ function CalculateNodePositions2()
 const lineData = {};
 function CalculateLines()
 {
-    let vertexBufferData = new Float32Array(allChannelCount * 24);
-    let texBufferData = new Float32Array(allChannelCount * 24);
-    let colorBufferData = new Float32Array(allChannelCount * 48);
-
+    let colorBufferData = new Float32Array(allChannelCount * 48 * lineSegments);
+/*
     let index = 0;
     for (let i = 0; i < allChannelCount; ++i)
     {
-        for (let j = 0; j < 24; ++j)
-            vertexBufferData[index + j] = 0;
-
         texBufferData[index] = 1;
         texBufferData[index + 1] = 0;
         texBufferData[index + 2] = 0;
@@ -702,30 +697,23 @@ function CalculateLines()
         texBufferData[index + 23] = 1;
 
         index += 24;
-    }
+    }*/
 
     CalculateLineColors(colorBufferData);
 
-    let offsetBufferData = new Float32Array(allChannelCount * 24);
+    let vertexBufferData = new Float32Array(allChannelCount * 24 * lineSegments);
 
     let vertexBuffer = ctx.createBuffer();
-    let texBuffer = ctx.createBuffer();
-    let offsetBuffer = ctx.createBuffer();
     let colorBuffer = ctx.createBuffer();
 
     lineData.vertexBuffer = vertexBuffer;
-    lineData.texBuffer = texBuffer;
-    lineData.offsetBuffer = offsetBuffer;
     lineData.colorBuffer = colorBuffer;
     lineData.vertexCount = allChannelCount * 12;
 
-    lineData.offsetBufferData = offsetBufferData;
+    lineData.vertexBufferData = vertexBufferData;
 
-    ctx.bindBuffer(ctx.ARRAY_BUFFER, vertexBuffer);
-    ctx.bufferData(ctx.ARRAY_BUFFER, vertexBufferData, ctx.STATIC_DRAW);
-
-    ctx.bindBuffer(ctx.ARRAY_BUFFER, texBuffer);
-    ctx.bufferData(ctx.ARRAY_BUFFER, texBufferData, ctx.STATIC_DRAW);
+    //ctx.bindBuffer(ctx.ARRAY_BUFFER, vertexBuffer);
+    //ctx.bufferData(ctx.ARRAY_BUFFER, offsetBufferData, ctx.STATIC_DRAW);
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, colorBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, colorBufferData, ctx.STATIC_DRAW);
@@ -738,6 +726,7 @@ const lineAlpha = 1;
 function CalculateLineColors(colorBufferData)
 {
     let colorBufferIndex = 0;
+    const target = 6 * lineSegments;
     for (let i = 0; i < allChannelCount; ++i)
     {
         let currentChannel = allChannelsByIndex[i];
@@ -753,7 +742,8 @@ function CalculateLineColors(colorBufferData)
         let g2 = Number.parseInt(color2.substr(3, 2), 16) / 255;
         let b2 = Number.parseInt(color2.substr(5, 2), 16) / 255;
 
-        for (let j = 0; j < 6; ++j)
+
+        for (let j = 0; j < target; ++j)
         {
             colorBufferData[colorBufferIndex++] = r1;
             colorBufferData[colorBufferIndex++] = g1;
@@ -761,7 +751,7 @@ function CalculateLineColors(colorBufferData)
             colorBufferData[colorBufferIndex++] = lineAlpha;
         }
         
-        for (let j = 0; j < 6; ++j)
+        for (let j = 0; j < target; ++j)
         {
             colorBufferData[colorBufferIndex++] = r2;
             colorBufferData[colorBufferIndex++] = g2;
@@ -772,12 +762,21 @@ function CalculateLineColors(colorBufferData)
 }
 
 const lineWidth = 2 * coordMultiplier;
+const lineSegments = 1; // to reduce overdraw
+// but it doesn't actually reduce overdraw
+// but it is a more generic way to render lines so I leave it
+
 function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfTheFuckingLines(updateOnlyThisNode)
 {
-    let offsetBufferData = lineData.offsetBufferData;
+    let vertexBufferData = lineData.vertexBufferData;
     let addY = (boxSizeY * 2 + boxHeight) * coordMultiplier;
     
     let currentlyUpdatedChannels = updateOnlyThisNode ? updateOnlyThisNode["channels"] : allChannels;
+
+    // precalculated values
+    let wwtcm = windowWidth * coordMultiplier,
+        whtcm = windowHeight * coordMultiplier,
+        hdbls = 0.5 / lineSegments;
 
     for (let ch in currentlyUpdatedChannels)
     {
@@ -786,7 +785,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
         let node1 = allNodes[currentChannel["node1_pub"]];
         let node2 = allNodes[currentChannel["node2_pub"]];
         
-        let vertexIndex = currentChannel["order"] * 24;
+        let vertexIndex = currentChannel["order"] * 24 * lineSegments;
 
         let renderData1 = node1["renderData"], renderData2 = node2["renderData"];
 
@@ -808,83 +807,71 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 
         let sin = Math.sin(angle), cos = Math.cos(angle);
         // bottom right
-        let x1 = (posX1 + lineWidth * sin) * 2 - windowWidth * coordMultiplier;
-        let y1 = (posY1 - lineWidth * cos) * -2 + windowHeight * coordMultiplier;
+        let x1 = (posX1 + lineWidth * sin) * 2 - wwtcm;
+        let y1 = (posY1 - lineWidth * cos) * -2 + whtcm
         
         // top right
-        let x3 = (posX2 + lineWidth * sin) * 2 - windowWidth * coordMultiplier;
-        let y3 = (posY2 - lineWidth * cos) * -2 + windowHeight * coordMultiplier;
+        let x3 = (posX2 + lineWidth * sin) * 2 - wwtcm;
+        let y3 = (posY2 - lineWidth * cos) * -2 + whtcm;
         
         // bottom left
-        let x2 = (posX1 - lineWidth * sin) * 2 - windowWidth * coordMultiplier;
-        let y2 = (posY1 + lineWidth * cos) * -2 + windowHeight * coordMultiplier;
+        let x2 = (posX1 - lineWidth * sin) * 2 - wwtcm;
+        let y2 = (posY1 + lineWidth * cos) * -2 + whtcm;
         
         // top left
-        let x4 = (posX2 - lineWidth * sin) * 2 - windowWidth * coordMultiplier;
-        let y4 = (posY2 + lineWidth * cos) * -2 + windowHeight * coordMultiplier;
+        let x4 = (posX2 - lineWidth * sin) * 2 - wwtcm;
+        let y4 = (posY2 + lineWidth * cos) * -2 + whtcm;
 
-        // bottom middle
-        let x5 = x1 + (x3 - x1) * 0.5;
-        let y5 = y1 + (y3 - y1) * 0.5;
+        let prevX13 = x1, prevY13 = y1, prevX24 = x2, prevY24 = y2;
+        let addX13 = (x3 - x1) * hdbls, addY13 = (y3 - y1) * hdbls;
+        let addX24 = (x4 - x2) * hdbls, addY24 = (y4 - y2) * hdbls;
 
-        // top middle
-        let x6 = x2 + (x4 - x2) * 0.5;
-        let y6 = y2 + (y4 - y2) * 0.5;
+        for (let i = 0; i < lineSegments * 2; ++i)
+        {
+            // bottom middle
+            let newX13 = prevX13 + addX13;
+            let newY13 = prevY13 + addY13;
+    
+            // top middle
+            let newX24 = prevX24 + addX24;
+            let newY24 = prevY24 + addY24;
+            
+            vertexBufferData[vertexIndex++] = prevX13;
+            vertexBufferData[vertexIndex++] = prevY13;
+            vertexBufferData[vertexIndex++] = prevX24;
+            vertexBufferData[vertexIndex++] = prevY24;
+            vertexBufferData[vertexIndex++] = newX24;
+            vertexBufferData[vertexIndex++] = newY24;
+            
+            vertexBufferData[vertexIndex++] = prevX13;
+            vertexBufferData[vertexIndex++] = prevY13;
+            vertexBufferData[vertexIndex++] = newX24;
+            vertexBufferData[vertexIndex++] = newY24;
+            vertexBufferData[vertexIndex++] = newX13;
+            vertexBufferData[vertexIndex++] = newY13;
 
-        offsetBufferData[vertexIndex++] = x1;
-        offsetBufferData[vertexIndex++] = y1;
-        offsetBufferData[vertexIndex++] = x6;
-        offsetBufferData[vertexIndex++] = y6;
-        offsetBufferData[vertexIndex++] = x2;
-        offsetBufferData[vertexIndex++] = y2;
-        
-        offsetBufferData[vertexIndex++] = x1;
-        offsetBufferData[vertexIndex++] = y1;
-        offsetBufferData[vertexIndex++] = x5;
-        offsetBufferData[vertexIndex++] = y5;
-        offsetBufferData[vertexIndex++] = x6;
-        offsetBufferData[vertexIndex++] = y6;
-        
-        offsetBufferData[vertexIndex++] = x5;
-        offsetBufferData[vertexIndex++] = y5;
-        offsetBufferData[vertexIndex++] = x4;
-        offsetBufferData[vertexIndex++] = y4;
-        offsetBufferData[vertexIndex++] = x6;
-        offsetBufferData[vertexIndex++] = y6;
-        
-        offsetBufferData[vertexIndex++] = x5;
-        offsetBufferData[vertexIndex++] = y5;
-        offsetBufferData[vertexIndex++] = x3;
-        offsetBufferData[vertexIndex++] = y3;
-        offsetBufferData[vertexIndex++] = x4;
-        offsetBufferData[vertexIndex++] = y4;
+            prevX13 = newX13;
+            prevY13 = newY13;
+            prevX24 = newX24;
+            prevY24 = newY24;
+        }
     }
     
-    ctx.bindBuffer(ctx.ARRAY_BUFFER, lineData.offsetBuffer);
-    ctx.bufferData(ctx.ARRAY_BUFFER, offsetBufferData, ctx.STATIC_DRAW);
+    ctx.bindBuffer(ctx.ARRAY_BUFFER, lineData.vertexBuffer);
+    ctx.bufferData(ctx.ARRAY_BUFFER, vertexBufferData, ctx.STATIC_DRAW);
 }
 
 function DrawLines()
 {
-    ctx.enableVertexAttribArray(vLoc);
+    ctx.enableVertexAttribArray(vLocLine);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, lineData.vertexBuffer);
-    ctx.vertexAttribPointer(vLoc, 2, ctx.FLOAT, false, 0, 0);
+    ctx.vertexAttribPointer(vLocLine, 2, ctx.FLOAT, false, 0, 0);
 
-    ctx.enableVertexAttribArray(tLoc);
-    ctx.bindBuffer(ctx.ARRAY_BUFFER, lineData.texBuffer);
-    ctx.vertexAttribPointer(tLoc, 2, ctx.FLOAT, false, 0, 0);
-
-    ctx.enableVertexAttribArray(offsetLoc);
-    ctx.bindBuffer(ctx.ARRAY_BUFFER, lineData.offsetBuffer);
-    ctx.vertexAttribPointer(offsetLoc, 2, ctx.FLOAT, false, 0, 0);
-    
-    ctx.enableVertexAttribArray(colorLoc);
+    ctx.enableVertexAttribArray(colorLocLine);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, lineData.colorBuffer);
-    ctx.vertexAttribPointer(colorLoc, 4, ctx.FLOAT, false, 0, 0);
+    ctx.vertexAttribPointer(colorLocLine, 4, ctx.FLOAT, false, 0, 0);
     
-    ctx.bindTexture(ctx.TEXTURE_2D, whiteTexture);
-
-    ctx.drawArrays(ctx.TRIANGLES, 0, lineData.vertexCount);
+    ctx.drawArrays(ctx.TRIANGLES, 0, lineData.vertexCount * lineSegments);
 }
 
 let changed = false;
@@ -912,7 +899,14 @@ function Draw()
     changed = false;
     ctx.clear(ctx.COLOR_BUFFER_BIT);
 
+    ctx.useProgram(lineProgram);
+    ctx.uniform3f(cameraOffsetLocLine, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
+    ctx.uniform2f(windowSizeLocLine, windowWidthInverse, windowHeightInverse);
     DrawLines();
+
+    ctx.useProgram(program);
+    ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
+    ctx.uniform2f(windowSizeLoc, windowWidthInverse, windowHeightInverse);
     DrawNodes();
     DrawTexts();
 }
@@ -1122,9 +1116,9 @@ function RenderTexts()
         
         vertexData.push(right);
         vertexData.push(bottom);
-        vertexData.push(left);
-        vertexData.push(top);
         vertexData.push(right);
+        vertexData.push(top);
+        vertexData.push(left);
         vertexData.push(top);
 
         let uvLeft = offsetX * maxTextureSizeInverse;
@@ -1141,9 +1135,9 @@ function RenderTexts()
             
         uvData.push(uvRight);
         uvData.push(uvTop);
-        uvData.push(uvLeft);
-        uvData.push(uvBottom);
         uvData.push(uvRight);
+        uvData.push(uvBottom);
+        uvData.push(uvLeft);
         uvData.push(uvBottom);
 
         let currentOffsetX = currentNode["renderData"]["posX"] * 2;
@@ -1220,9 +1214,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
             
             vertexData.push(right);
             vertexData.push(bottom);
-            vertexData.push(left);
-            vertexData.push(top);
             vertexData.push(right);
+            vertexData.push(top);
+            vertexData.push(left);
             vertexData.push(top);
         }
 
@@ -1343,10 +1337,10 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         // top left
         vertices[vertexIndex++] = left0;
         vertices[vertexIndex++] = bottom0;
-        vertices[vertexIndex++] = left1;
-        vertices[vertexIndex++] = bottom0;
         vertices[vertexIndex++] = left0;
         vertices[vertexIndex++] = bottom1;
+        vertices[vertexIndex++] = left1;
+        vertices[vertexIndex++] = bottom0;
         
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom0;
@@ -1356,9 +1350,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom1;
 
         // top
-        vertices[vertexIndex++] = left1;
-        vertices[vertexIndex++] = bottom0;
         vertices[vertexIndex++] = left2;
+        vertices[vertexIndex++] = bottom0;
+        vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom0;
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom1;
@@ -1373,10 +1367,10 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         // top right
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom0;
-        vertices[vertexIndex++] = left3;
-        vertices[vertexIndex++] = bottom0;
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom1;
+        vertices[vertexIndex++] = left3;
+        vertices[vertexIndex++] = bottom0;
         
         vertices[vertexIndex++] = left3;
         vertices[vertexIndex++] = bottom0;
@@ -1386,9 +1380,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom1;
 
         // left
-        vertices[vertexIndex++] = left0;
-        vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left1;
+        vertices[vertexIndex++] = bottom1;
+        vertices[vertexIndex++] = left0;
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left0;
         vertices[vertexIndex++] = bottom2;
@@ -1401,9 +1395,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom2;
 
         // center
-        vertices[vertexIndex++] = left1;
-        vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left2;
+        vertices[vertexIndex++] = bottom1;
+        vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom2;
@@ -1416,9 +1410,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom2;
 
         // right
-        vertices[vertexIndex++] = left2;
-        vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left3;
+        vertices[vertexIndex++] = bottom1;
+        vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom2;
@@ -1431,9 +1425,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom2;
 
         // bottom left
-        vertices[vertexIndex++] = left0;
-        vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left1;
+        vertices[vertexIndex++] = bottom2;
+        vertices[vertexIndex++] = left0;
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left0;
         vertices[vertexIndex++] = bottom3;
@@ -1446,9 +1440,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom3;
 
         // bottom
-        vertices[vertexIndex++] = left1;
-        vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left2;
+        vertices[vertexIndex++] = bottom2;
+        vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom3;
@@ -1461,9 +1455,9 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom3;
 
         // bottom right
-        vertices[vertexIndex++] = left2;
-        vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left3;
+        vertices[vertexIndex++] = bottom2;
+        vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom3;
@@ -1476,12 +1470,10 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom3;
     }
 
-    ctx.enableVertexAttribArray(vLoc);
+    //ctx.enableVertexAttribArray(vLoc);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, vertexBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, vertices, ctx.STATIC_DRAW);
-    ctx.vertexAttribPointer(vLoc, 2, ctx.FLOAT, false, 0, 0);
-    
-    ctx.uniform2f(windowSizeLoc, windowWidthInverse, windowHeightInverse);
+    //ctx.vertexAttribPointer(vLoc, 2, ctx.FLOAT, false, 0, 0);
 }
 
 let zoom = 0.125 / coordMultiplier;
@@ -1538,10 +1530,10 @@ function InitWebglData()
         // top right
         uvs[uvIndex++] = uvRight;
         uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvTop;
         uvs[uvIndex++] = uvRight;
         uvs[uvIndex++] = uvBottom;
+        uvs[uvIndex++] = uvLeft;
+        uvs[uvIndex++] = uvTop;
         
         uvs[uvIndex++] = uvLeft;
         uvs[uvIndex++] = uvTop;
@@ -1551,9 +1543,9 @@ function InitWebglData()
         uvs[uvIndex++] = uvBottom;
 
         // left
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.99;
         uvs[uvIndex++] = 0.25;
+        uvs[uvIndex++] = 0.99;
+        uvs[uvIndex++] = 0;
         uvs[uvIndex++] = 0.99;
         uvs[uvIndex++] = 0;
         uvs[uvIndex++] = 1;
@@ -1568,10 +1560,10 @@ function InitWebglData()
         // center
         uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 0.99;
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 0.99;
         uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.26;
+        uvs[uvIndex++] = 0.99;
         
         uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 0.99;
@@ -1581,9 +1573,9 @@ function InitWebglData()
         uvs[uvIndex++] = 1;
 
         // right
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0.9;
         uvs[uvIndex++] = 0;
+        uvs[uvIndex++] = 0.9;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 0.9;
         uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
@@ -1596,10 +1588,10 @@ function InitWebglData()
         uvs[uvIndex++] = 1;
 
         // bottom left
+        uvs[uvIndex++] = uvRight;
+        uvs[uvIndex++] = uvBottom;
         uvs[uvIndex++] = uvLeft;
         uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvBottom
         uvs[uvIndex++] = uvLeft;
         uvs[uvIndex++] = uvTop;
         
@@ -1611,9 +1603,9 @@ function InitWebglData()
         uvs[uvIndex++] = uvTop;
         
         // bottom
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
         uvs[uvIndex++] = 0.26;
+        uvs[uvIndex++] = 1;
+        uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 1;
         uvs[uvIndex++] = 0.25;
         uvs[uvIndex++] = 0;
@@ -1626,9 +1618,9 @@ function InitWebglData()
         uvs[uvIndex++] = 0;
 
         // bottom right
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvBottom;
         uvs[uvIndex++] = uvLeft;
+        uvs[uvIndex++] = uvBottom;
+        uvs[uvIndex++] = uvRight;
         uvs[uvIndex++] = uvBottom;
         uvs[uvIndex++] = uvRight;
         uvs[uvIndex++] = uvTop;
@@ -1668,9 +1660,11 @@ let vertexBuffer, texBuffer;
 let vLoc, tLoc;
 let offsetBuffer, offsetLoc;
 let colorBuffer, colorLoc;
+let vLocLine, colorLocLine;
 let texture, whiteTexture;
 let cameraOffsetLoc, windowSizeLoc;
-let program;
+let cameraOffsetLocLine, windowSizeLocLine;
+let program, lineProgram;
 function WebglInit()
 {
     const vertexShader = `
@@ -1700,23 +1694,60 @@ function WebglInit()
         gl_FragColor = texture2D(sampler0, vTex, -0.8) * color;
     }
     `;
+    
+    const vertexShaderLine = `
+    attribute vec2 aVertex;
+    attribute vec4 col;
+    varying vec4 color;
+    uniform vec3 cameraOffset; // x, y: camera pos, z: zoom
+    uniform vec2 windowSize;
+    void main()
+    {
+        gl_Position = vec4((aVertex + cameraOffset.xy) * windowSize * cameraOffset.z, 0.0, 1.0);
+        color = col;
+    }
+    `;
+
+    const fragmentShaderLine = `
+    precision mediump float;
+    varying vec4 color;
+    void main()
+    {
+        gl_FragColor = color;
+    }
+    `;
 
     ctx.enable(ctx.BLEND);
     ctx.blendFunc(ctx.SRC_ALPHA, ctx.ONE_MINUS_SRC_ALPHA);
+    
+    ctx.enable(ctx.CULL_FACE);
+    ctx.cullFace(ctx.BACK);
+
+    ctx.clearColor(0.2, 0.2, 0.2, 1);
 
     const vertShaderObj = ctx.createShader(ctx.VERTEX_SHADER);
     const fragShaderObj = ctx.createShader(ctx.FRAGMENT_SHADER);
+    const vertShaderObjLine = ctx.createShader(ctx.VERTEX_SHADER);
+    const fragShaderObjLine = ctx.createShader(ctx.FRAGMENT_SHADER);
     ctx.shaderSource(vertShaderObj, vertexShader);
+    ctx.shaderSource(vertShaderObjLine, vertexShaderLine);
     ctx.shaderSource(fragShaderObj, fragmentShader);
+    ctx.shaderSource(fragShaderObjLine, fragmentShaderLine);
     ctx.compileShader(vertShaderObj);
+    ctx.compileShader(vertShaderObjLine);
     ctx.compileShader(fragShaderObj);
+    ctx.compileShader(fragShaderObjLine);
 
     program = ctx.createProgram();
     ctx.attachShader(program, vertShaderObj);
     ctx.attachShader(program, fragShaderObj);
-
     ctx.linkProgram(program);
-    ctx.useProgram(program);
+    //ctx.useProgram(program);
+
+    lineProgram = ctx.createProgram();
+    ctx.attachShader(lineProgram, vertShaderObjLine);
+    ctx.attachShader(lineProgram, fragShaderObjLine);
+    ctx.linkProgram(lineProgram);
 
     vertexBuffer = ctx.createBuffer();
     texBuffer = ctx.createBuffer();
@@ -1729,10 +1760,13 @@ function WebglInit()
     colorLoc = ctx.getAttribLocation(program, "col");
 
     cameraOffsetLoc = ctx.getUniformLocation(program, "cameraOffset");
-    ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
-    
     windowSizeLoc = ctx.getUniformLocation(program, "windowSize");
 
+    vLocLine = ctx.getAttribLocation(lineProgram, "aVertex");
+    colorLocLine = ctx.getAttribLocation(lineProgram, "col");
+    cameraOffsetLocLine = ctx.getUniformLocation(lineProgram, "cameraOffset");
+    windowSizeLocLine = ctx.getUniformLocation(lineProgram, "windowSize");
+    
 
     let texImage = new Image();
     let whiteImage = new Image();
