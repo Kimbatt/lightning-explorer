@@ -15,6 +15,15 @@ function CopyText(text)
     clipboard.selectionStart = clipboard.selectionEnd;
 }
 
+let searchMask = 1;
+function SetSearchMask(mask, add)
+{
+    if (add)
+        searchMask |= mask;
+    else
+        searchMask &= ~mask;
+}
+
 let nodeSearchData = {};
 const searchMaxCount = 5;
 function UpdateSearchResults(ev)
@@ -52,7 +61,7 @@ function UpdateSearchResults(ev)
             let current = searchResultButtons[i];
             let currentNode = results[keys[i]];
             current.nodePubKey = currentNode["pub_key"];
-            current.innerHTML = currentNode["alias"];
+            current.innerHTML = currentNode["alias_htmlEscaped"];
             current.style.display = "";
         }
 
@@ -76,9 +85,13 @@ function Search(pattern)
     {
         for (let searchStr in nodeSearchData)
         {
+            let data = nodeSearchData[searchStr];
+            if (!(data[1] & searchMask))
+                continue;
+
             if (searchStr.search(pattern) != -1)
             {
-                let node = nodeSearchData[searchStr];
+                let node = data[0];
 
                 if (!(node["pub_key"] in matches))
                 {
@@ -103,6 +116,10 @@ function Search(pattern)
 
     for (let searchStr in nodeSearchData)
     {
+        let data = nodeSearchData[searchStr];
+        if (!(data[1] & searchMask))
+            continue;
+        
         let textIndex = patternLength - 1;
         let patternIndex = patternLength - 1;
 
@@ -118,7 +135,7 @@ function Search(pattern)
 
                 if (matchingCharacters == patternLength)
                 {
-                    let node = nodeSearchData[searchStr];
+                    let node = data[0];
     
                     if (!(node["pub_key"] in matches))
                     {
@@ -153,38 +170,71 @@ function SearchStop()
     searchResultsDiv.className = "search_results_hidden";
 }
 
-function SelectNode(selectedNode, doMoveToNode)
+let connectionCodeToCopy;
+function CopyConnectionCode()
 {
-    if (!selectedNode)
+    CopyText(connectionCodeToCopy);
+}
+
+function SelectNode(node, doMoveToNode)
+{
+    if (!node)
     {
         // shold not happen
         return;
     }
 
+    DeselectNode();
+
+    selectedNode = node;
+
     let nodeDetailsDiv = document.getElementById("node_details");
     nodeDetailsDiv.className = "node_details_visible";
 
     let nodeDetailsAlias = document.getElementById("node_details_alias");
-    nodeDetailsAlias.innerHTML = selectedNode["hasNoAlias"] ? "(not set)" : selectedNode["alias"];
+    nodeDetailsAlias.innerHTML = node["hasNoAlias"] ? "(not set)" : node["alias_htmlEscaped"];
     
     let nodeDetailsPubkey = document.getElementById("node_details_pubkey");
-    nodeDetailsPubkey.innerHTML = selectedNode["pub_key"];
+    nodeDetailsPubkey.innerHTML = node["pub_key"];
     
     let nodeDetailsIP = document.getElementById("node_details_ip");
 
-    if (selectedNode["addresses"].length != 0)
-        nodeDetailsIP.innerHTML = selectedNode["addresses"][0]["addr"];
+    let copyConnectionCodeButton = document.getElementById("copy_code_button");
+    if (node["addresses"].length != 0)
+    {
+        nodeDetailsIP.innerHTML = node["addresses"][0]["addr"];
+        copyConnectionCodeButton.disabled = false;
+        connectionCodeToCopy = node["pub_key"] + "@" + node["addresses"][0]["addr"];
+    }
     else
-        nodeDetailsIP.innerHTML = "unknown";
+    {
+        nodeDetailsIP.innerHTML = "Unknown";
+        copyConnectionCodeButton.disabled = true;
+    }
     
     if (doMoveToNode)
-        MoveToNode(selectedNode);
+        MoveToNode(node);
+
+    SetNodeUVs(node["renderData"]["order"] * 108, true);
+    ctx.bindBuffer(ctx.ARRAY_BUFFER, texBuffer);
+    ctx.bufferData(ctx.ARRAY_BUFFER, nodeUVs, ctx.STATIC_DRAW);
+    Changed();
 }
 
 function DeselectNode()
 {
+    if (!selectedNode)
+        return;
+
     let nodeDetailsDiv = document.getElementById("node_details");
     nodeDetailsDiv.className = "node_details_hidden";
+    
+    SetNodeUVs(selectedNode["renderData"]["order"] * 108, false);
+    ctx.bindBuffer(ctx.ARRAY_BUFFER, texBuffer);
+    ctx.bufferData(ctx.ARRAY_BUFFER, nodeUVs, ctx.STATIC_DRAW);
+    Changed();
+
+    selectedNode = undefined;
 }
 
 window.addEventListener("load", function()

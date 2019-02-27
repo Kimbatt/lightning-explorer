@@ -13,6 +13,35 @@ body
     font-family: Verdana, Geneva, Tahoma, sans-serif;
 }
 
+button
+{
+    background-color: #146dff;
+    border: none;
+    border-radius: 5px;
+    color: #ffffff;
+    padding: 5px 8px 5px 8px;
+    font-family: "Verdana";
+    font-size: 20px;
+    transition: 0.15s;
+    outline: none;
+}
+
+button:disabled
+{
+    background-color: #77abff;
+    cursor: not-allowed;
+}
+
+button:enabled
+{
+    cursor: pointer;
+}
+
+button:enabled:hover
+{
+    background-color: #54adff;
+}
+
 #loading_overlay
 {
     user-select: none;
@@ -39,6 +68,7 @@ body
     font-size: 20px;
     padding: 4px;
     border: 1px solid white;
+    border-radius: 0px;
     background: #121316;
     color: white;
     width: 100%;
@@ -58,10 +88,16 @@ body
     transition: background 0.1s linear;
 }
 
+.search_result_element:disabled
+{
+    background: #121316;
+    cursor: initial;
+}
+
 #search_results
 {
     position: absolute;
-    top: 78px;
+    top: 88px;
     left: 20px;
     border: 1px solid white;
     background: #121316;
@@ -80,7 +116,7 @@ body
     opacity: 0;
 }
 
-#node_details
+#node_details,#more_info
 {
     display: table;
     position: absolute;
@@ -118,6 +154,46 @@ body
 .node_details_element
 {
     display: inline-block;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.node_more_details_label
+{
+    display: inline-block;
+    width: 200px;
+    margin-top: 5px;
+}
+
+#search_options_overlay,#more_info_overlay
+{
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    transition: 0.15s linear;
+}
+
+.search_options_overlay_visible
+{
+    opacity: 1;
+    visibility: visible;
+}
+
+.search_options_overlay_hidden
+{
+    opacity: 0;
+    visibility: hidden;
+}
+
+#search_options
+{
+    background-color: black;
+    padding: 10px;
+    margin: 10px;
+    border: 2px solid white;
+    display: table;
 }
 
 </style>
@@ -134,18 +210,47 @@ body
 </div>
 
 <div style="position: absolute; top: 10px; left: 10px; padding: 6px; background: #121316; color: white; border: 2px solid white;">
-    <div style="font-size: 20px;">Search</div>
-    <input type="text" oninput="UpdateSearchResults(event)" onfocus="UpdateSearchResults(event)" onblur="SearchStop()" style="background: #121316; color: white; border: 1px solid #a0a3a1; padding: 3px; font-size: 20px; margin-top: 5px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 24px; display: inline-block;">Search</div>
+        <button style="display: inline-block" onclick="document.getElementById('search_options_overlay').className='search_options_overlay_visible'">Options</button>
+    </div>
+    <input type="text" oninput="UpdateSearchResults(event)" onfocus="UpdateSearchResults(event)" onblur="SearchStop()" style="display: block; background: #121316; color: white; border: 1px solid #a0a3a1; padding: 3px; font-size: 20px; margin-top: 5px;">
 </div>
-
 <div id="search_results" class="search_results_hidden"></div>
+
 <div id="node_details" class="node_details_hidden">
     <div style="font-size: 20px; margin-bottom: 10px;">Node information</div>
-    <div class="node_details_label">Name:</div><div class="node_details_element" id="node_details_alias">asdfasdfasdfasdfasdf</div>
+    <div class="node_details_label">Name:</div><div class="node_details_element" id="node_details_alias"></div>
     <br>
-    <div class="node_details_label">Public key:</div><div class="node_details_element" id="node_details_pubkey">0200072fd301cb4a680f26d87c28b705ccd6a1d5b00f1b5efd7fe5f998f1bbb1f1</div>
+    <div class="node_details_label">Public key:</div><div class="node_details_element" id="node_details_pubkey"></div>
     <br>
-    <div class="node_details_label">IP address:</div><div class="node_details_element" id="node_details_ip">123.123.123.123</div>
+    <div class="node_details_label">Address:</div><div class="node_details_element" id="node_details_ip"></div>
+    <br>
+    <div style="padding: 4px; display: flex; justify-content: space-evenly;">
+        <button id="copy_code_button" onclick="CopyConnectionCode()">Copy connection code</button>
+        <button id="more_info_button" onclick="document.getElementById('more_info_overlay').className='search_options_overlay_visible'">Show more information</button>
+    </div>
+</div>
+
+<div id="search_options_overlay" class="search_options_overlay_hidden" onclick="this.className='search_options_overlay_hidden'">
+    <div id="search_options" onclick="event.stopPropagation()">
+        <label style="font-size: 20px; display: block;"><input type="checkbox" onchange="SetSearchMask(2, event.target.checked)">&nbsp;Search for public keys</label>
+        <label style="font-size: 20px; display: block; margin-top: 8px;"><input type="checkbox" onchange="SetSearchMask(4, event.target.checked)">&nbsp;Search for addresses</label>
+        <button style="float: right; margin-top: 20px; font-size: 20px; width: 100px;" onclick="document.getElementById('search_options_overlay').className='search_options_overlay_hidden'">OK</button>
+    </div>
+</div>
+
+<div id="more_info_overlay" class="search_options_overlay_hidden" onclick="this.className='search_options_overlay_hidden'">
+    <div style="width: 100%; height: 100%; display: flex; justify-content: center; align-content: center;">
+        <div id="more_info" onclick="event.stopPropagation()">
+            <div class="node_more_details_label">Number of channels:</div><div class="node_details_element" id="node_details_alias">123</div>
+            <br>
+            <div class="node_more_details_label">asdasd:</div><div class="node_details_element" id="node_details_pubkey">456</div>
+        </div>
+    </div>
+</div>
+        
+
 </div>
 
 <canvas id="canvas" style="position: absolute; top: 0px; left: 0px; z-index: -1;" oncontextmenu="return false"></canvas>

@@ -77,7 +77,7 @@ function PageLoaded()
         let errorFunction = function()
         {
             let loadingText = document.getElementById("loading_text");
-            loadingText.innerHTML = "Error";
+            loadingText.innerHTML = "Loading error";
             textDiv.innerHTML = "See console for details";
         };
 
@@ -130,6 +130,7 @@ let dragged = false; // <-- true if the camera was actually moved
 let isNodeDragging = false;
 let interactLocked = false;
 let draggedNode = undefined;
+let selectedNode = undefined;
 let nodeDragStartX = 0, nodeDragStartY = 0;
 canvas.addEventListener("mousedown", function(ev)
 {
@@ -166,14 +167,6 @@ window.addEventListener("mouseup", function(ev)
     if (ev.button === 2)
     {
         isCameraDragging = false;
-
-        //if (!dragged)
-        //{
-        //    let clickedNode = GetNodeFromMousePos(ev.clientX, ev.clientY);
-        //    if (clickedNode)
-        //        console.log("clicked node: " + clickedNode["alias"]);
-        //}
-
         dragged = false;
     }
     else if (ev.button === 0)
@@ -182,18 +175,38 @@ window.addEventListener("mouseup", function(ev)
             EndDraggingNode(draggedNode);
     }
 });
-window.addEventListener("mousemove", function(ev)
+
+let mouseDeltaX = 0, mouseDeltaY = 0;
+// this function is here because some browsers fire the mousemove event more frequently than the maximum framerate
+// so we just store the mouse movements, and only render once per frame
+function MouseMoveHaxFunction()
 {
-    if (interactLocked)
+    window.requestAnimationFrame(MouseMoveHaxFunction);
+
+    if (mouseDeltaX == 0 || mouseDeltaY == 0)
         return;
 
     if (isCameraDragging)
     {
         dragged = true;
-        CameraDrag(ev.movementX, ev.movementY);
+        CameraDrag(mouseDeltaX, mouseDeltaY);
     }
     else if (isNodeDragging)
-        DragNode(draggedNode, ev.movementX, ev.movementY);
+        DragNode(draggedNode, mouseDeltaX, mouseDeltaY);
+
+    mouseDeltaX = 0;
+    mouseDeltaY = 0;
+}
+
+window.requestAnimationFrame(MouseMoveHaxFunction);
+
+window.addEventListener("mousemove", function(ev)
+{
+    if (interactLocked)
+        return;
+
+    mouseDeltaX += ev.movementX;
+    mouseDeltaY += ev.movementY;
 });
 canvas.addEventListener("wheel", function(ev)
 {
@@ -313,7 +326,7 @@ function EndDraggingNode(node)
         {
             for (let y = prevGridStartY; y <= prevGridEndY; ++y)
             {
-                let gridKey = x + " " + y;
+                let gridKey = ((x + 16384) << 16) | (y + 16384);
 
                 let currentGridElements = grid[gridKey];
 
@@ -326,7 +339,7 @@ function EndDraggingNode(node)
         {
             for (let y = newGridStartY; y <= newGridEndY; ++y)
             {
-                let gridKey = x + " " + y;
+                let gridKey = ((x + 16384) << 16) | (y + 16384);
 
                 let currentGridElements = grid[gridKey];
                 if (currentGridElements === undefined)
@@ -417,7 +430,7 @@ function GetNodeFromMousePos(x, y)
     let posY = ((endY - startY) * percentY + startY) * coordMultiplier + cameraOffsetY;
 
     let gridX = posX >> gridSize, gridY = posY >> gridSize;
-    let currentGridElements = grid[gridX + " " + gridY];
+    let currentGridElements = grid[((gridX + 16384) << 16) | (gridY + 16384)];
     if (currentGridElements !== undefined)
     {
         for (let node in currentGridElements)
@@ -467,18 +480,23 @@ function CalculateNodeData()
                 currentNode["hasNoAlias"] = true;
             }
 
-            nodeSearchData[currentNode["alias"].toLowerCase()] = currentNode;
+            currentNode["alias_htmlEscaped"] = currentNode["alias"]
+                                               .replace(/&/g, "&amp;")
+                                               .replace(/</g, "&lt;")
+                                               .replace(/>/g, "&gt;")
+                                               .replace(/"/g, "&quot;")
+                                               .replace(/'/g, "&#039;");
 
-            // enabling this will allow searching for pubkeys and addresses
+            nodeSearchData[currentNode["alias"].toLowerCase()] = [currentNode, 1];
 
-            //nodeSearchData[pubkey] = currentNode;
-            //
-            //let addresses = currentNode["addresses"];
-            //if (addresses)
-            //{
-            //    for (let j = 0; j < addresses.length; ++j)
-            //        nodeSearchData[addresses[j]["addr"]] = currentNode;
-            //}
+            nodeSearchData[pubkey] = [currentNode, 2];
+
+            let addresses = currentNode["addresses"];
+            if (addresses)
+            {
+                for (let j = 0; j < addresses.length; ++j)
+                    nodeSearchData[addresses[j]["addr"]] = [currentNode, 4];
+            }
 
             currentNode.renderData["textWidth"] = tctx.measureText(currentNode["alias"]).width;
             ++allNodeCount;
@@ -521,7 +539,7 @@ function CalculateNodeData()
 };
 
 const grid = {};
-const gridSize = 4; // 2^gridSize
+const gridSize = 10; // 2^gridSize
 function CalculateNodePositions()
 {
     const coils = 100;
@@ -557,7 +575,7 @@ function CalculateNodePositions()
         {
             for (let y = gridStartY; y <= gridEndY; ++y)
             {
-                let gridKey = x + " " + y;
+                let gridKey = ((x + 16384) << 16) | (y + 16384);
 
                 let currentGridElements = grid[gridKey];
                 if (currentGridElements === undefined)
@@ -645,7 +663,7 @@ function CalculateNodePositions2()
         {
             for (let y = gridStartY; y <= gridEndY; ++y)
             {
-                let gridKey = x + " " + y;
+                let gridKey = ((x + 16384) << 16) | (y + 16384);
 
                 let currentGridElements = grid[gridKey];
                 if (currentGridElements === undefined)
@@ -761,7 +779,7 @@ function CalculateLineColors(colorBufferData)
     }
 }
 
-const lineWidth = 2 * coordMultiplier;
+const lineWidth = 1 * coordMultiplier;
 const lineSegments = 1; // to reduce overdraw
 // but it doesn't actually reduce overdraw
 // but it is a more generic way to render lines so I leave it
@@ -1476,18 +1494,158 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
     //ctx.vertexAttribPointer(vLoc, 2, ctx.FLOAT, false, 0, 0);
 }
 
+function SetNodeUVs(uvIndex, isHighlighted)
+{
+    let highlight = isHighlighted ? 0.5 : 0;
+    let uvLeft = 0 + highlight, uvRight = 0.25 + highlight, uvBottom = 1, uvTop = 0;
+    // top left
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+    
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    
+    // top
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvRight + 0.01;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    
+    nodeUVs[uvIndex++] = uvRight + 0.01;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight + 0.01;
+    nodeUVs[uvIndex++] = uvBottom;
+    
+    // top right
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvTop;
+    
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+
+    // left
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+    
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+
+    // center
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight + 0.01;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    nodeUVs[uvIndex++] = uvRight + 0.01;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+
+    // right
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom - 0.01;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+
+    // bottom left
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvTop;
+    
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    
+    // bottom
+    nodeUVs[uvIndex++] = uvRight + 0.01;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    
+    nodeUVs[uvIndex++] = uvRight + 0.01;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvRight + 0.01;
+    nodeUVs[uvIndex++] = uvTop;
+
+    // bottom right
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvBottom;
+    nodeUVs[uvIndex++] = uvRight;
+    nodeUVs[uvIndex++] = uvTop;
+    nodeUVs[uvIndex++] = uvLeft;
+    nodeUVs[uvIndex++] = uvTop;
+}
+
 let zoom = 0.125 / coordMultiplier;
 const maxZoom = zoom * 1000, minZoom = zoom * 0.001;
 
 let vertexOffsets;
+let nodeUVs;
 function InitWebglData()
 {
     let count = allNodeCount;
-    let uvs = new Float32Array(count * 12 * 9);
+    nodeUVs = new Float32Array(count * 12 * 9);
     let colors = new Float32Array(count * 24 * 9);
     vertexOffsets = new Float32Array(count * 12 * 9);
 
-    let uvIndex = 0;
     let vertexOffsetIndices = 0;
     let colorIndex = 0;
 
@@ -1496,141 +1654,7 @@ function InitWebglData()
         for (let j = 0; j < 108; ++j)
             vertexOffsets[vertexOffsetIndices++] = 0;
 
-        let uvLeft = 0, uvRight = 0.25, uvBottom = 1, uvTop = 0;
-        // top left
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvBottom;
-        
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvBottom;
-        
-        // top
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
-        
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 1;
-        
-        // top right
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvTop;
-        
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvBottom;
-
-        // left
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0.99;
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.99;
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 1;
-        
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0.99;
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
-
-        // center
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0.99;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 0.99;
-        
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0.99;
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
-
-        // right
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
-        
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.9;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 1;
-
-        // bottom left
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvTop;
-        
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvTop;
-        
-        // bottom
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0;
-        
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 1;
-        uvs[uvIndex++] = 0.25;
-        uvs[uvIndex++] = 0;
-        uvs[uvIndex++] = 0.26;
-        uvs[uvIndex++] = 0;
-
-        // bottom right
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvTop;
-        
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvBottom;
-        uvs[uvIndex++] = uvRight;
-        uvs[uvIndex++] = uvTop;
-        uvs[uvIndex++] = uvLeft;
-        uvs[uvIndex++] = uvTop;
+        SetNodeUVs(i * 108, false);
 
         for (let j = 0; j < 216; j += 4)
         {
@@ -1642,7 +1666,7 @@ function InitWebglData()
     }
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, texBuffer);
-    ctx.bufferData(ctx.ARRAY_BUFFER, uvs, ctx.STATIC_DRAW);
+    ctx.bufferData(ctx.ARRAY_BUFFER, nodeUVs, ctx.STATIC_DRAW);
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, offsetBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, vertexOffsets, ctx.STATIC_DRAW);
@@ -1799,11 +1823,10 @@ function WebglInit()
     }
 
     texImage.onload = ImageLoaded;
-    texImage.src = "data:image/png;base64,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";
+    texImage.src = "data:image/png;base64,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";
 
     whiteImage.onload = ImageLoaded;
     whiteImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
-    
 }
 
 function Intersect(p1x1, p1y1, p1x2, p1y2, p2x1, p2y1, p2x2, p2y2)
