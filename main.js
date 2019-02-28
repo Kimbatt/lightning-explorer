@@ -183,7 +183,7 @@ function MouseMoveHaxFunction()
 {
     window.requestAnimationFrame(MouseMoveHaxFunction);
 
-    if (mouseDeltaX == 0 || mouseDeltaY == 0)
+    if (mouseDeltaX == 0 && mouseDeltaY == 0)
         return;
 
     if (isCameraDragging)
@@ -457,6 +457,8 @@ let allNodesSortedByChannelCount;
 let tempNodes, tempChannels;
 let allNodeCount = 0;
 let allChannelCount = 0;
+let renderedChannelsByIndex = [];
+let renderedChannelCount = 0;
 function CalculateNodeData()
 {
     tctx.font = baseFontSize + "px Verdana";
@@ -499,6 +501,8 @@ function CalculateNodeData()
             }
 
             currentNode.renderData["textWidth"] = tctx.measureText(currentNode["alias"]).width;
+            currentNode["capacity"] = 0;
+            currentNode["hasChannelWith"] = {};
             ++allNodeCount;
         }
     };
@@ -515,12 +519,25 @@ function CalculateNodeData()
             node2 !== undefined && node2 !== "" &&
             allNodes.hasOwnProperty(node1) && allNodes.hasOwnProperty(node2))
         {
-            allNodes[node1].channels[channelId] = currentChannel;
-            allNodes[node2].channels[channelId] = currentChannel;
+            let node1object = allNodes[node1];
+            node1object.channels[channelId] = currentChannel;
+            node1object["capacity"] += Number(currentChannel["capacity"]);
+
+            let node2object = allNodes[node2];
+            node2object.channels[channelId] = currentChannel;
             allChannels[channelId] = currentChannel;
+            
+            if (!node1object["hasChannelWith"][node2])
+            {
+                node1object["hasChannelWith"][node2] = true;
+                node2object["hasChannelWith"][node1] = true;
+
+                renderedChannelsByIndex[renderedChannelCount] = currentChannel;
+                currentChannel["order"] = renderedChannelCount;
+                ++renderedChannelCount;
+            }
 
             allChannelsByIndex[allChannelCount] = currentChannel;
-            currentChannel["order"] = allChannelCount;
             ++allChannelCount;
         }
     }
@@ -542,10 +559,10 @@ const grid = {};
 const gridSize = 10; // 2^gridSize
 function CalculateNodePositions()
 {
-    const coils = 100;
+    const coils = 200;
     const step = allNodeCount * 50 / (coils * 2 * Math.PI);
-    const maxDist = 2000;
-    const distanceMultiplier = 0.5;
+    const maxDist = 1000;
+    const distanceMultiplier = 0.7;
 
     let theta = maxDist / step;
 
@@ -681,52 +698,18 @@ function CalculateNodePositions2()
 const lineData = {};
 function CalculateLines()
 {
-    let colorBufferData = new Float32Array(allChannelCount * 48 * lineSegments);
-/*
-    let index = 0;
-    for (let i = 0; i < allChannelCount; ++i)
-    {
-        texBufferData[index] = 1;
-        texBufferData[index + 1] = 0;
-        texBufferData[index + 2] = 0;
-        texBufferData[index + 3] = 1;
-        texBufferData[index + 4] = 0;
-        texBufferData[index + 5] = 0;
-    
-        texBufferData[index + 6] = 1;
-        texBufferData[index + 7] = 0;
-        texBufferData[index + 8] = 1;
-        texBufferData[index + 9] = 1;
-        texBufferData[index + 10] = 0;
-        texBufferData[index + 11] = 1;
-        
-        texBufferData[index + 12] = 1;
-        texBufferData[index + 13] = 0;
-        texBufferData[index + 14] = 0;
-        texBufferData[index + 15] = 1;
-        texBufferData[index + 16] = 0;
-        texBufferData[index + 17] = 0;
-    
-        texBufferData[index + 18] = 1;
-        texBufferData[index + 19] = 0;
-        texBufferData[index + 20] = 1;
-        texBufferData[index + 21] = 1;
-        texBufferData[index + 22] = 0;
-        texBufferData[index + 23] = 1;
-
-        index += 24;
-    }*/
+    let colorBufferData = new Float32Array(renderedChannelCount * 48 * lineSegments);
 
     CalculateLineColors(colorBufferData);
 
-    let vertexBufferData = new Float32Array(allChannelCount * 24 * lineSegments);
+    let vertexBufferData = new Float32Array(renderedChannelCount * 24 * lineSegments);
 
     let vertexBuffer = ctx.createBuffer();
     let colorBuffer = ctx.createBuffer();
 
     lineData.vertexBuffer = vertexBuffer;
     lineData.colorBuffer = colorBuffer;
-    lineData.vertexCount = allChannelCount * 12;
+    lineData.vertexCount = renderedChannelCount * 12;
 
     lineData.vertexBufferData = vertexBufferData;
 
@@ -745,9 +728,9 @@ function CalculateLineColors(colorBufferData)
 {
     let colorBufferIndex = 0;
     const target = 6 * lineSegments;
-    for (let i = 0; i < allChannelCount; ++i)
+    for (let i = 0; i < renderedChannelCount; ++i)
     {
-        let currentChannel = allChannelsByIndex[i];
+        let currentChannel = renderedChannelsByIndex[i];
 
         let color1 = allNodes[currentChannel["node1_pub"]]["color"];
         let color2 = allNodes[currentChannel["node2_pub"]]["color"];
@@ -780,7 +763,7 @@ function CalculateLineColors(colorBufferData)
 }
 
 const lineWidth = 1 * coordMultiplier;
-const lineSegments = 1; // to reduce overdraw
+const lineSegments = 4; // to reduce overdraw
 // but it doesn't actually reduce overdraw
 // but it is a more generic way to render lines so I leave it
 
@@ -789,7 +772,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
     let vertexBufferData = lineData.vertexBufferData;
     let addY = (boxSizeY * 2 + boxHeight) * coordMultiplier;
     
-    let currentlyUpdatedChannels = updateOnlyThisNode ? updateOnlyThisNode["channels"] : allChannels;
+    let currentlyUpdatedChannels = updateOnlyThisNode ? updateOnlyThisNode["channels"] : renderedChannelsByIndex;
 
     // precalculated values
     let wwtcm = windowWidth * coordMultiplier,
@@ -798,7 +781,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 
     for (let ch in currentlyUpdatedChannels)
     {
-        let currentChannel = allChannels[ch];
+        let currentChannel = currentlyUpdatedChannels[ch];
 
         let node1 = allNodes[currentChannel["node1_pub"]];
         let node2 = allNodes[currentChannel["node2_pub"]];
@@ -906,11 +889,12 @@ function Changed()
     }
 
     changed = true;
-    Draw();
 }
 
 function Draw()
 {
+    window.requestAnimationFrame(Draw);
+
     if (!changed)
         return;
 
@@ -928,6 +912,8 @@ function Draw()
     DrawNodes();
     DrawTexts();
 }
+
+window.requestAnimationFrame(Draw);
 
 function DrawNodes()
 {
@@ -1063,7 +1049,7 @@ function CreateTextureFromCanvas(vertexData, uvData, offsetData, colorData)
     return ret;
 }
 
-const maxTextureSize = 2048;
+const maxTextureSize = 4096;
 function RenderTexts()
 {
     let maxTextureSizeInverse = 1 / maxTextureSize;
@@ -1259,7 +1245,8 @@ function Loaded()
 
     //TestRandomize();
 
-    Draw();
+    //Draw();
+    //Changed();
 }
 
 

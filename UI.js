@@ -171,9 +171,22 @@ function SearchStop()
 }
 
 let connectionCodeToCopy;
-function CopyConnectionCode()
+let timeoutId = -1;
+function CopyConnectionCode(ev)
 {
     CopyText(connectionCodeToCopy);
+
+    if (timeoutId !== -1)
+        return;
+
+    let button = ev.target;
+    timeoutId = window.setTimeout(function()
+    {
+        timeoutId = -1;
+        button.innerHTML = "Copy connection code";
+    }, 2000);
+
+    button.innerHTML = "Copied!";
 }
 
 function SelectNode(node, doMoveToNode)
@@ -182,6 +195,13 @@ function SelectNode(node, doMoveToNode)
     {
         // shold not happen
         return;
+    }
+    
+    if (timeoutId !== -1)
+    {
+        window.clearInterval(timeoutId);
+        timeoutId = -1;
+        document.getElementById("copy_code_button").innerHTML = "Copy connection code";
     }
 
     DeselectNode();
@@ -212,6 +232,10 @@ function SelectNode(node, doMoveToNode)
         copyConnectionCodeButton.disabled = true;
     }
     
+    let channelCount = Object.keys(node["channels"]).length;
+    document.getElementById("node_details_numchannels").innerHTML = channelCount;
+    document.getElementById("node_details_capacity").innerHTML = node["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
+    
     if (doMoveToNode)
         MoveToNode(node);
 
@@ -235,6 +259,66 @@ function DeselectNode()
     Changed();
 
     selectedNode = undefined;
+}
+
+function ShowChannelInfo(show = true)
+{
+    document.getElementById("current_channel_info_overlay").className = show ? "search_options_overlay_visible" : "search_options_overlay_hidden";
+    if (!show)
+        return;
+
+    let currentChannel = allChannels[this.channelID];
+    let node1 = allNodes[currentChannel["node1_pub"]];
+    let node2 = allNodes[currentChannel["node2_pub"]];
+
+    document.getElementById("current_channel_id").innerHTML = this.channelID;
+    document.getElementById("current_channel_node1").innerHTML = node1["alias_htmlEscaped"];
+    document.getElementById("current_channel_node2").innerHTML = node2["alias_htmlEscaped"];
+    document.getElementById("current_channel_capacity").innerHTML = currentChannel["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
+    document.getElementById("current_channel_lastupdate").innerHTML = new Date(currentChannel["last_update"] * 1000)
+                                                                      .toLocaleTimeString(navigator.language, {"year" : "numeric", "month": "short", "day": "2-digit" ,"weekday" : "short"});
+}
+
+function ShowChannels(show)
+{
+    document.getElementById("channels_overlay").className = show ? "search_options_overlay_visible" : "search_options_overlay_hidden";
+
+    if (!selectedNode)
+        return;
+
+    let channels = selectedNode["channels"];
+    let channelCount = Object.keys(channels).length;
+
+    let channelListDiv = document.getElementById("channels_list");
+    let currentCount = channelListDiv.childElementCount;
+
+    if (currentCount < channelCount)
+    {
+        for (let i = currentCount; i < channelCount; ++i)
+        {
+            let current = document.createElement("button");
+            current.className = "channels_list_element";
+            current.onclick = ShowChannelInfo;
+            channelListDiv.appendChild(current);
+        }
+    }
+
+    let idx = 0;
+
+    let selectedNodePubkey = selectedNode["pub_key"];
+    for (let ch in channels)
+    {
+        let current = channelListDiv.children[idx];
+        let currentChannel = channels[ch];
+        current.innerHTML = ch + "&nbsp;&nbsp;&nbsp;other node: " +
+                            allNodes[selectedNodePubkey === currentChannel["node2_pub"] ? currentChannel["node1_pub"] : currentChannel["node2_pub"]]["alias_htmlEscaped"];
+        current.channelID = ch;
+        current.style.display = "table";
+        ++idx;
+    }
+
+    for (let i = idx; i < currentCount; ++i)
+        channelListDiv.children[i].style.display = "none";
 }
 
 window.addEventListener("load", function()
