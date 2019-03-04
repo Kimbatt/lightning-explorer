@@ -39,7 +39,7 @@ function Resized()
 
 function PageLoaded()
 {
-    if (window.location.protocol === "file:")
+    if (window.location.protocol === "file:" && false)
     {
         let script = document.createElement("script");
         script.onload = function()
@@ -100,7 +100,12 @@ function PageLoaded()
                     tempChannels = responseData["edges"];
                     Resized();
                     CalculateNodeData();
-                    CalculateNodePositions();
+
+                    if (responseData.hasOwnProperty("pos"))
+                        SetNodePositions(responseData["pos"]);
+                    else
+                        CalculateNodePositions();
+
                     RenderTexts();
                     CalculateLines();
                     WebglInit();
@@ -579,6 +584,34 @@ function CalculateNodePositions()
         let renderData = currentNode["renderData"];
         renderData["posX"] = posX;
         renderData["posY"] = posY;
+    }
+
+    BuildGrid();
+}
+
+function SetNodePositions(positionData)
+{
+    const multiplier = 10;
+    for (let i = 0; i < allNodeCount; ++i)
+    {
+        let currentNode = allNodesByIndex[i];
+        let renderData = currentNode["renderData"];
+        let currentPositionData = positionData[i];
+
+        renderData["posX"] = currentPositionData[0] * multiplier;
+        renderData["posY"] = currentPositionData[1] * multiplier;
+    }
+
+    BuildGrid();
+}
+
+function BuildGrid()
+{
+    for (let i = 0; i < allNodeCount; ++i)
+    {
+        let currentNode = allNodesByIndex[i];
+        let renderData = currentNode["renderData"];
+        let posX = renderData["posX"], posY = renderData["posY"];
 
         let endPosX = posX + (boxSizeX * 2 + renderData["textWidth"]) * coordMultiplier;
         let endPosY = posY + (boxSizeY * 2 + boxHeight) * coordMultiplier;
