@@ -701,7 +701,11 @@ function StartPhysicsSimulation(start)
         {
             let currentNode = allNodesByIndex[i];
             if (isNodeDragging && currentNode === draggedNode)
+            {
+                currentNode["velocityX"] = 0;
+                currentNode["velocityY"] = 0;
                 continue;
+            }
 
             let currentPubkey = currentNode["pub_key"];
             let currentDegree = 1 / (currentNode["channelCount"] + 1);
