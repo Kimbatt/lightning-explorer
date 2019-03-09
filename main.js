@@ -8,7 +8,7 @@ const tctx = textCanvas.getContext("2d");
 //textCanvas.style = "border: 2px solid red; z-index: 1;";
 const baseFontSize = 48;
 
-const coordMultiplier = 1; // reduce this for increased precision
+const coordMultiplier = 0.0625; // reduce this for increased precision
 
 let windowWidth, windowHeight, windowWidthInverse, windowHeightInverse;
 let prevWindowWidth = 0, prevWindowHeight = 0;
@@ -24,9 +24,6 @@ function Resized()
     canvas.height = windowHeight;
     ctx.viewport(0, 0, windowWidth, windowHeight);
 
-    //textCanvas.width = windowWidth;
-    //textCanvas.height = windowHeight;
-
     if (webglInitialized)
     {
         FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices();
@@ -39,7 +36,7 @@ function Resized()
 
 function PageLoaded()
 {
-    if (window.location.protocol === "file:" && false)
+    if (window.location.protocol === "file:")
     {
         let script = document.createElement("script");
         script.onload = function()
@@ -49,7 +46,12 @@ function PageLoaded()
     
             Resized();
             CalculateNodeData();
-            CalculateNodePositions();
+
+            if (__nodes.hasOwnProperty("pos"))
+                SetNodePositions(__nodes["pos"]);
+            else
+                CalculateNodePositions();
+
             RenderTexts();
             CalculateLines();
             WebglInit();
@@ -61,7 +63,7 @@ function PageLoaded()
                 loadingOverlayStyle.display = "none";
             }, 300);
         };
-        script.src = "graph.js";
+        script.src = "networkgraphv2.js";
         document.getElementsByTagName("body")[0].appendChild(script);
     }
     else
@@ -368,8 +370,10 @@ function MoveToNode(node)
     let startZoom = zoom;
     let targetZoom = 1 / coordMultiplier;
 
-    let targetPosX = node["renderData"]["posX"] + (-windowWidth * 0.5 + node["renderData"]["textWidth"] * 0.5 + textPaddingX) * coordMultiplier;
-    let targetPosY = node["renderData"]["posY"] + (-windowHeight * 0.5 + (boxSizeY + boxHeight * 0.5)) * coordMultiplier;
+    let addX = (-windowWidth * 0.5 + node["renderData"]["textWidth"] * 0.5 + textPaddingX) * coordMultiplier;
+    let addY = (-windowHeight * 0.5 + (boxSizeY + boxHeight * 0.5)) * coordMultiplier;
+    let targetPosX = node["renderData"]["posX"] + addX;
+    let targetPosY = node["renderData"]["posY"] + addY;
     let startPosX = -cameraOffsetX, startPosY = cameraOffsetY;
     
     const steps = 50;
@@ -385,10 +389,22 @@ function MoveToNode(node)
 
     function Update()
     {
-        if (currentStepMove <= steps)
+        if (currentStepMove <= steps || physicsRunning)
         {
-            let percent = currentStepMove / steps;
-            let t = Math.sin((percent - 0.5) * Math.PI) * 0.5 + 0.5;
+            let t;
+            if (physicsRunning)
+            {
+                targetPosX = node["renderData"]["posX"] + addX;
+                targetPosY = node["renderData"]["posY"] + addY;
+            }
+            
+            if (currentStepMove > steps)
+                t = 1;
+            else
+            {
+                let percent = currentStepMove / steps;
+                t = Math.sin((percent - 0.5) * Math.PI) * 0.5 + 0.5;
+            }
             
             cameraOffsetX = -(startPosX + (targetPosX - startPosX) * t);
             cameraOffsetY = startPosY + (targetPosY - startPosY) * t;
@@ -476,6 +492,7 @@ function CalculateNodeData()
         {
             allNodes[pubkey] = currentNode;
             currentNode["channels"] = {};
+            currentNode["renderedChannels"] = [];
             allNodesByIndex.push(currentNode);
 
             currentNode.renderData = {};
@@ -484,25 +501,28 @@ function CalculateNodeData()
             if (currentNode["alias"] === "")
             {
                 currentNode["alias"] = pubkey.substr(0, 12);
+                currentNode["alias_htmlEscaped"] = currentNode["alias"];
                 currentNode["hasNoAlias"] = true;
             }
+            else
+            {
+                currentNode["alias_htmlEscaped"] = currentNode["alias"]
+                                                .replace(/&/g, "&amp;")
+                                                .replace(/</g, "&lt;")
+                                                .replace(/>/g, "&gt;")
+                                                .replace(/"/g, "&quot;")
+                                                .replace(/'/g, "&#039;");
+            }
 
-            currentNode["alias_htmlEscaped"] = currentNode["alias"]
-                                               .replace(/&/g, "&amp;")
-                                               .replace(/</g, "&lt;")
-                                               .replace(/>/g, "&gt;")
-                                               .replace(/"/g, "&quot;")
-                                               .replace(/'/g, "&#039;");
+            nodeSearchData.push([currentNode, currentNode["alias"].toLowerCase(), 1]);
 
-            nodeSearchData[currentNode["alias"].toLowerCase()] = [currentNode, 1];
-
-            nodeSearchData[pubkey] = [currentNode, 2];
+            nodeSearchData.push([currentNode, pubkey, 2]);
 
             let addresses = currentNode["addresses"];
             if (addresses)
             {
                 for (let j = 0; j < addresses.length; ++j)
-                    nodeSearchData[addresses[j]["addr"]] = [currentNode, 4];
+                    nodeSearchData.push([currentNode, addresses[j]["addr"], 4]);
             }
 
             currentNode.renderData["textWidth"] = tctx.measureText(currentNode["alias"]).width;
@@ -525,11 +545,11 @@ function CalculateNodeData()
             allNodes.hasOwnProperty(node1) && allNodes.hasOwnProperty(node2))
         {
             let node1object = allNodes[node1];
-            node1object.channels[channelId] = currentChannel;
+            node1object["channels"][channelId] = currentChannel;
             node1object["capacity"] += Number(currentChannel["capacity"]);
 
             let node2object = allNodes[node2];
-            node2object.channels[channelId] = currentChannel;
+            node2object["channels"][channelId] = currentChannel;
             allChannels[channelId] = currentChannel;
             
             if (!node1object["hasChannelWith"][node2])
@@ -539,6 +559,9 @@ function CalculateNodeData()
 
                 renderedChannelsByIndex[renderedChannelCount] = currentChannel;
                 currentChannel["order"] = renderedChannelCount;
+                node1object["renderedChannels"].push(currentChannel);
+                node2object["renderedChannels"].push(currentChannel);
+
                 ++renderedChannelCount;
             }
 
@@ -550,7 +573,7 @@ function CalculateNodeData()
     for (let i = 0; i < allNodeCount; ++i)
     {
         let currentNode = allNodesByIndex[i];
-        currentNode["channelCount"] = Object.keys(currentNode.channels).length;
+        currentNode["channelCount"] = Object.keys(currentNode["channels"]).length;
     }
 
     allNodesSortedByChannelCount = allNodesByIndex.slice();
@@ -591,7 +614,7 @@ function CalculateNodePositions()
 
 function SetNodePositions(positionData)
 {
-    const multiplier = 10;
+    const multiplier = 10 * coordMultiplier;
     for (let i = 0; i < allNodeCount; ++i)
     {
         let currentNode = allNodesByIndex[i];
@@ -640,92 +663,122 @@ function BuildGrid()
     }
 }
 
-function CalculateNodePositions2()
+let physicsRunning = false;
+let physicsInitialized = false;
+function StartPhysicsSimulation(start)
 {
-    const circleSize = 40000 * coordMultiplier;
-    for (let i = 0; i < allNodeCount; ++i)
+    physicsRunning = start;
+
+    if (!start)
+        return;
+
+    if (!physicsInitialized)
     {
-        let currentNode = allNodesByIndex[i];
-
-        currentNode.renderData["posX"] = Math.cos(i / allNodeCount * Math.PI * 2) * circleSize;
-        currentNode.renderData["posY"] = Math.sin(i / allNodeCount * Math.PI * 2) * circleSize;
-    }
-
-    const target = 5000 * coordMultiplier;
-
-    for (let c = 0; c < 20; ++c)
-    {
-        let newPositions = new Array(allNodeCount);
+        const circleSize = 40000 * coordMultiplier;
         for (let i = 0; i < allNodeCount; ++i)
         {
             let currentNode = allNodesByIndex[i];
+
+            currentNode.renderData["posX"] = Math.cos(i / allNodeCount * Math.PI * 2) * circleSize;
+            currentNode.renderData["posY"] = Math.sin(i / allNodeCount * Math.PI * 2) * circleSize;
+
+            currentNode["velocityX"] = 0;
+            currentNode["velocityY"] = 0;
+        }
+
+        physicsInitialized = true;
+    }
+
+    const attractionMultiplier = 1000 * coordMultiplier;
+    const repulsionMultiplier = 0.00004 / coordMultiplier;
+    const drag = 0.95;
+    const repMultiplier = 0.01 * coordMultiplier;
+    const multiplier = 0.05;
+
+    let update = function()
+    {
+        for (let i = 0; i < allNodeCount; ++i)
+        {
+            let currentNode = allNodesByIndex[i];
+            if (isNodeDragging && currentNode === draggedNode)
+                continue;
+
             let currentPubkey = currentNode["pub_key"];
+            let currentDegree = 1 / (currentNode["channelCount"] + 1);
 
             let dx = 0, dy = 0;
             let posX = currentNode["renderData"]["posX"], posY = currentNode["renderData"]["posY"];
-            for (let channel in currentNode.channels)
+            for (let channel in currentNode["renderedChannels"])
             {
-                let ch = currentNode.channels[channel];
+                let ch = currentNode["renderedChannels"][channel];
                 let otherNode = allNodes[(ch["node1_pub"] == currentPubkey) ? ch["node2_pub"] : ch["node1_pub"]];
                 
                 let ox = otherNode["renderData"]["posX"], oy = otherNode["renderData"]["posY"];
 
                 let distX = ox - posX, distY = oy - posY;
                 let angle = Math.atan2(distY, distX);
-                let x1 = Math.cos(angle) * target, y1 = Math.sin(angle) * target;
+                let dist = Math.sqrt(distX * distX + distY * distY);
+                let cosAngle = Math.cos(angle), sinAngle = Math.sin(angle);
 
-                let diffX = distX - x1, diffY = distY - y1;
-                
-                dx += diffX;
-                dy += diffY;
+                let rep = dist * currentDegree * repMultiplier;
+                let _log = Math.log(dist * repulsionMultiplier) * attractionMultiplier * Math.log(dist) * currentDegree;
+
+                let ax = _log * cosAngle, ay = _log * sinAngle;
+                let rx = rep * cosAngle, ry = rep * sinAngle;
+                dx += ax - rx;
+                dy += ay - ry;
             }
 
-            dx *= 0.002;
-            dy *= 0.002;
-
-            newPositions[i] = [posX + dx, posY + dy];
+            currentNode["velocityX"] += dx * multiplier;
+            currentNode["velocityY"] += dy * multiplier;
         }
-
+        
+        let startIndex = 0;
         for (let i = 0; i < allNodeCount; ++i)
         {
-            let coord = newPositions[i];
             let currentNode = allNodesByIndex[i];
-            currentNode["renderData"]["posX"] = coord[0];
-            currentNode["renderData"]["posY"] = coord[1];
-        }
-    }
+            currentNode["renderData"]["posX"] += currentNode["velocityX"];
+            currentNode["renderData"]["posY"] += currentNode["velocityY"];
 
-    for (let i = 0; i < allNodeCount; ++i)
-    {
-        let currentNode = allNodesByIndex[i];
-        let renderData = currentNode["renderData"];
-        let posX = renderData["posX"], posY = renderData["posY"];
+            currentNode["velocityX"] *= drag;
+            currentNode["velocityY"] *= drag;
 
-        let endPosX = posX + (boxSizeX * 2 + renderData["textWidth"]) * coordMultiplier;
-        let endPosY = posY + (boxSizeY * 2 + boxHeight) * coordMultiplier;
-
-        let gridStartX = (posX >> gridSize),
-            gridStartY = (posY >> gridSize),
-            gridEndX = (endPosX >> gridSize),
-            gridEndY = (endPosY >> gridSize);
-
-        for (let x = gridStartX; x <= gridEndX; ++x)
-        {
-            for (let y = gridStartY; y <= gridEndY; ++y)
+            let x = currentNode["renderData"]["posX"] * 2, y = currentNode["renderData"]["posY"] * -2;
+            for (let j = 0; j < 54; ++j)
             {
-                let gridKey = ((x + 16384) << 16) | (y + 16384);
-
-                let currentGridElements = grid[gridKey];
-                if (currentGridElements === undefined)
-                {
-                    currentGridElements = {};
-                    grid[gridKey] = currentGridElements;
-                }
-
-                currentGridElements[currentNode["pub_key"]] = currentNode;
+                vertexOffsets[startIndex++] = x;
+                vertexOffsets[startIndex++] = y;
+            }
+            
+            let currentOffsetX = currentNode["renderData"]["posX"] * 2;
+            let currentOffsetY = currentNode["renderData"]["posY"] * -2 - (baseFontSize * 2 + textPaddingY * 2 + 30) * coordMultiplier;
+            let textOffsetBufferData = textAtlases[currentNode["renderData"]["atlasID"]]["offsetBufferData"];
+            let startIndex2 = currentNode["renderData"]["atlasIndex"];
+            for (let i = 0; i < 6; ++i)
+            {
+                textOffsetBufferData[startIndex2++] = currentOffsetX;
+                textOffsetBufferData[startIndex2++] = currentOffsetY;
             }
         }
-    }
+
+        ctx.bindBuffer(ctx.ARRAY_BUFFER, offsetBuffer);
+        ctx.bufferData(ctx.ARRAY_BUFFER, vertexOffsets, ctx.STATIC_DRAW);
+    
+        for (let a in textAtlases)
+        {
+            ctx.bindBuffer(ctx.ARRAY_BUFFER, textAtlases[a]["offsetBuffer"]);
+            ctx.bufferData(ctx.ARRAY_BUFFER, textAtlases[a]["offsetBufferData"], ctx.STATIC_DRAW);
+        }
+
+        FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfTheFuckingLines();
+        Changed();
+        BuildGrid();
+
+        if (physicsRunning)
+            window.requestAnimationFrame(update);
+    };
+
+    window.requestAnimationFrame(update);
 }
 
 const lineData = {};
@@ -805,16 +858,16 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
     let vertexBufferData = lineData.vertexBufferData;
     let addY = (boxSizeY * 2 + boxHeight) * coordMultiplier;
     
-    let currentlyUpdatedChannels = updateOnlyThisNode ? updateOnlyThisNode["channels"] : renderedChannelsByIndex;
+    let currentlyUpdatedChannels = updateOnlyThisNode ? updateOnlyThisNode["renderedChannels"] : renderedChannelsByIndex;
 
     // precalculated values
     let wwtcm = windowWidth * coordMultiplier,
         whtcm = windowHeight * coordMultiplier,
         hdbls = 0.5 / lineSegments;
 
-    for (let ch in currentlyUpdatedChannels)
+    for (let i = 0; i < currentlyUpdatedChannels.length; ++i)
     {
-        let currentChannel = currentlyUpdatedChannels[ch];
+        let currentChannel = currentlyUpdatedChannels[i];
 
         let node1 = allNodes[currentChannel["node1_pub"]];
         let node2 = allNodes[currentChannel["node2_pub"]];

@@ -24,7 +24,7 @@ function SetSearchMask(mask, add)
         searchMask &= ~mask;
 }
 
-let nodeSearchData = {};
+let nodeSearchData = [];
 const searchMaxCount = 5;
 function UpdateSearchResults(ev)
 {
@@ -83,12 +83,13 @@ function Search(pattern)
     let count = 0;
     if (pattern.length < 4)
     {
-        for (let searchStr in nodeSearchData)
+        for (let i = 0; i < nodeSearchData.length; ++i)
         {
-            let data = nodeSearchData[searchStr];
-            if (!(data[1] & searchMask))
+            let data = nodeSearchData[i];
+            if (!(data[2] & searchMask))
                 continue;
 
+            let searchStr = data[1];
             if (searchStr.search(pattern) != -1)
             {
                 let node = data[0];
@@ -114,12 +115,13 @@ function Search(pattern)
         patternData[char] = index < 1 ? 1 : index;
     }
 
-    for (let searchStr in nodeSearchData)
+    for (let i = 0; i < nodeSearchData.length; ++i)
     {
-        let data = nodeSearchData[searchStr];
-        if (!(data[1] & searchMask))
+        let data = nodeSearchData[i];
+        if (!(data[2] & searchMask))
             continue;
         
+        let searchStr = data[1];
         let textIndex = patternLength - 1;
         let patternIndex = patternLength - 1;
 
