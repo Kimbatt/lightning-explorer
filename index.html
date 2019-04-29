@@ -243,6 +243,19 @@ button:enabled:hover
     outline: none;
 }
 
+.channels_list_element_id
+{
+    display: inline-block;
+    margin-right: 80px;
+}
+
+.channels_list_element_name
+{
+    display: inline;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-weight: normal;
+}
+
 .channels_list_element:enabled
 {
     cursor: pointer;
@@ -260,11 +273,71 @@ button:enabled:hover
     cursor: initial;
 }
 
+#current_channel_node1,#current_channel_node2
+{
+    text-decoration: underline;
+}
+
+#current_channel_node1:hover,#current_channel_node2:hover
+{
+    color: #2ec2f0;
+    cursor: pointer;
+}
+
+#loading_spinner_outer
+{
+    height: 15vh;
+    margin-left: 5vh;
+    transform-origin: 50% 50%;
+    animation: loading_spin 1.618s linear infinite;
+}
+
+#loading_spinner_inner
+{
+    stroke-dasharray: 10 150;
+    transform-origin: 50% 50%;
+    animation: loading_resize 1.5s linear infinite;
+}
+
+@keyframes loading_spin
+{
+    100%
+    {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes loading_resize
+{
+    0%
+    {
+        stroke-dasharray: 20 150;
+        stroke-dashoffset: 0;
+        transform: rotate(0deg);
+    }
+
+    50%
+    {
+        stroke-dasharray: 110 150;
+        transform: rotate(90deg);
+    }
+
+    100%
+    {
+        stroke-dasharray: 20 150;
+        transform: rotate(360deg);
+    }
+}
+
 </style>
 </head>
 <body style="overflow: hidden;">
 <div id="loading_overlay" oncontextmenu="return false">
-    <div id="loading_text" style="font-size: 20vh;">Loading...</div>
+    <div id="loading_text" style="font-size: 20vh;">Loading
+        <svg id="loading_spinner_outer" viewbox="0 0 50 50">
+            <circle id="loading_spinner_inner" cx="25" cy="25" r="20" fill="none" stroke-width="5" stroke-linecap="round" stroke="white"></circle>
+        </svg>
+    </div>
     <div id="loading_text2" style="font-size: 10vh; margin-top: 10vh;">Loading graph data...</div>
 </div>
 
@@ -331,9 +404,9 @@ button:enabled:hover
     <div id="current_channel_info" onclick="event.stopPropagation()">
         <div class="node_details_label2">Channel Id:</div><div class="node_details_element2" id="current_channel_id"></div>
         <br>
-        <div class="node_details_label2">Node 1:</div><div class="node_details_element2" id="current_channel_node1"></div>
+        <div class="node_details_label2">Node 1:</div><div class="node_details_element2" id="current_channel_node1" onclick="JumpToNodeFromChannels(this)"></div>
         <br>
-        <div class="node_details_label2">Node 2:</div><div class="node_details_element2" id="current_channel_node2"></div>
+        <div class="node_details_label2">Node 2:</div><div class="node_details_element2" id="current_channel_node2" onclick="JumpToNodeFromChannels(this)"></div>
         <br>
         <div class="node_details_label2">Capacity:</div><div class="node_details_element2" id="current_channel_capacity"></div>
         <br>

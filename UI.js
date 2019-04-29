@@ -44,7 +44,7 @@ function UpdateSearchResults(ev)
     if (keys.length == 0)
     {
         let current = searchResultButtons[0];
-        current.innerHTML = "No results";
+        current.innerText = "No results";
         current.disabled = true;
 
         for (let i = 1; i < searchMaxCount; ++i)
@@ -61,7 +61,7 @@ function UpdateSearchResults(ev)
             let current = searchResultButtons[i];
             let currentNode = results[keys[i]];
             current.nodePubKey = currentNode["pub_key"];
-            current.innerHTML = currentNode["alias_htmlEscaped"];
+            current.innerText = currentNode["alias"];
             current.style.display = "";
         }
 
@@ -185,10 +185,10 @@ function CopyConnectionCode(ev)
     timeoutId = window.setTimeout(function()
     {
         timeoutId = -1;
-        button.innerHTML = "Copy connection code";
+        button.innerText = "Copy connection code";
     }, 2000);
 
-    button.innerHTML = "Copied!";
+    button.innerText = "Copied!";
 }
 
 function SelectNode(node, doMoveToNode)
@@ -203,7 +203,7 @@ function SelectNode(node, doMoveToNode)
     {
         window.clearInterval(timeoutId);
         timeoutId = -1;
-        document.getElementById("copy_code_button").innerHTML = "Copy connection code";
+        document.getElementById("copy_code_button").innerText = "Copy connection code";
     }
 
     DeselectNode();
@@ -214,29 +214,29 @@ function SelectNode(node, doMoveToNode)
     nodeDetailsDiv.className = "node_details_visible";
 
     let nodeDetailsAlias = document.getElementById("node_details_alias");
-    nodeDetailsAlias.innerHTML = node["hasNoAlias"] ? "(not set)" : node["alias_htmlEscaped"];
+    nodeDetailsAlias.innerText = node["hasNoAlias"] ? "(not set)" : node["alias"];
     
     let nodeDetailsPubkey = document.getElementById("node_details_pubkey");
-    nodeDetailsPubkey.innerHTML = node["pub_key"];
+    nodeDetailsPubkey.innerText = node["pub_key"];
     
     let nodeDetailsIP = document.getElementById("node_details_ip");
 
     let copyConnectionCodeButton = document.getElementById("copy_code_button");
     if (node["addresses"].length != 0)
     {
-        nodeDetailsIP.innerHTML = node["addresses"][0]["addr"];
+        nodeDetailsIP.innerText = node["addresses"][0]["addr"];
         copyConnectionCodeButton.disabled = false;
         connectionCodeToCopy = node["pub_key"] + "@" + node["addresses"][0]["addr"];
     }
     else
     {
-        nodeDetailsIP.innerHTML = "Unknown";
+        nodeDetailsIP.innerText = "Unknown";
         copyConnectionCodeButton.disabled = true;
     }
     
     let channelCount = Object.keys(node["channels"]).length;
-    document.getElementById("node_details_numchannels").innerHTML = channelCount;
-    document.getElementById("node_details_capacity").innerHTML = node["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
+    document.getElementById("node_details_numchannels").innerText = channelCount;
+    document.getElementById("node_details_capacity").innerText = node["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
     
     if (doMoveToNode)
         MoveToNode(node);
@@ -263,6 +263,13 @@ function DeselectNode()
     selectedNode = undefined;
 }
 
+function JumpToNodeFromChannels(element)
+{
+    document.getElementById("current_channel_info_overlay").className = "search_options_overlay_hidden";
+    document.getElementById("channels_overlay").className = "search_options_overlay_hidden";
+    SelectNode(allNodes[element.nodeID], true);
+}
+
 function ShowChannelInfo(show = true)
 {
     document.getElementById("current_channel_info_overlay").className = show ? "search_options_overlay_visible" : "search_options_overlay_hidden";
@@ -273,11 +280,18 @@ function ShowChannelInfo(show = true)
     let node1 = allNodes[currentChannel["node1_pub"]];
     let node2 = allNodes[currentChannel["node2_pub"]];
 
-    document.getElementById("current_channel_id").innerHTML = this.channelID;
-    document.getElementById("current_channel_node1").innerHTML = node1["alias_htmlEscaped"];
-    document.getElementById("current_channel_node2").innerHTML = node2["alias_htmlEscaped"];
-    document.getElementById("current_channel_capacity").innerHTML = currentChannel["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
-    document.getElementById("current_channel_lastupdate").innerHTML = new Date(currentChannel["last_update"] * 1000)
+    document.getElementById("current_channel_id").innerText = this.channelID;
+
+    let node1Element = document.getElementById("current_channel_node1");
+    node1Element.innerText = node1["alias"];
+    node1Element.nodeID = currentChannel["node1_pub"];
+
+    let node2Element = document.getElementById("current_channel_node2");
+    node2Element.innerText = node2["alias"];
+    node2Element.nodeID = currentChannel["node2_pub"];
+
+    document.getElementById("current_channel_capacity").innerText = currentChannel["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
+    document.getElementById("current_channel_lastupdate").innerText = new Date(currentChannel["last_update"] * 1000)
                                                                       .toLocaleTimeString(navigator.language, {"year" : "numeric", "month": "short", "day": "2-digit" ,"weekday" : "short"});
 }
 
@@ -285,7 +299,7 @@ function ShowChannels(show)
 {
     document.getElementById("channels_overlay").className = show ? "search_options_overlay_visible" : "search_options_overlay_hidden";
 
-    if (!selectedNode)
+    if (!selectedNode || !show)
         return;
 
     let channels = selectedNode["channels"];
@@ -301,6 +315,15 @@ function ShowChannels(show)
             let current = document.createElement("button");
             current.className = "channels_list_element";
             current.onclick = ShowChannelInfo;
+
+            let idDiv = document.createElement("div");
+            idDiv.className = "channels_list_element_id";
+            current.appendChild(idDiv);
+
+            let nameDiv = document.createElement("div");
+            nameDiv.className = "channels_list_element_name";
+            current.appendChild(nameDiv);
+
             channelListDiv.appendChild(current);
         }
     }
@@ -312,8 +335,11 @@ function ShowChannels(show)
     {
         let current = channelListDiv.children[idx];
         let currentChannel = channels[ch];
-        current.innerHTML = ch + "&nbsp;&nbsp;&nbsp;other node: " +
-                            allNodes[selectedNodePubkey === currentChannel["node2_pub"] ? currentChannel["node1_pub"] : currentChannel["node2_pub"]]["alias_htmlEscaped"];
+
+        let idDiv = current.children[0];
+        let nameDiv = current.children[1];
+        idDiv.innerText = ch;
+        nameDiv.innerText = allNodes[selectedNodePubkey === currentChannel["node2_pub"] ? currentChannel["node1_pub"] : currentChannel["node2_pub"]]["alias"];
         current.channelID = ch;
         current.style.display = "table";
         ++idx;

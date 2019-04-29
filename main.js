@@ -36,7 +36,7 @@ function Resized()
 
 function PageLoaded()
 {
-    if (window.location.protocol === "file:")
+    if (window.location.protocol === "file:" && false) // debug only
     {
         let script = document.createElement("script");
         script.onload = function()
@@ -73,14 +73,14 @@ function PageLoaded()
         let textDiv = document.getElementById("loading_text2");
         request.onprogress = function(ev)
         {
-            textDiv.innerHTML = (ev.loaded / 1048576).toFixed(1) + "MB loaded";
+            textDiv.innerText = (ev.loaded / 1048576).toFixed(1) + "MB loaded";
         };
 
         let errorFunction = function()
         {
             let loadingText = document.getElementById("loading_text");
-            loadingText.innerHTML = "Loading error";
-            textDiv.innerHTML = "See console for details";
+            loadingText.innerText = "Loading error";
+            textDiv.innerText = "See console for details";
         };
 
         request.onload = function(ev)
@@ -93,7 +93,7 @@ function PageLoaded()
 
             window.requestAnimationFrame(function()
             {
-                textDiv.innerHTML = "Processing data...";
+                textDiv.innerText = "Processing data...";
                 window.requestAnimationFrame(function()
                 {
                     let responseData = JSON.parse(ev.target.responseText);
@@ -501,17 +501,7 @@ function CalculateNodeData()
             if (currentNode["alias"] === "")
             {
                 currentNode["alias"] = pubkey.substr(0, 12);
-                currentNode["alias_htmlEscaped"] = currentNode["alias"];
                 currentNode["hasNoAlias"] = true;
-            }
-            else
-            {
-                currentNode["alias_htmlEscaped"] = currentNode["alias"]
-                                                .replace(/&/g, "&amp;")
-                                                .replace(/</g, "&lt;")
-                                                .replace(/>/g, "&gt;")
-                                                .replace(/"/g, "&quot;")
-                                                .replace(/'/g, "&#039;");
             }
 
             nodeSearchData.push([currentNode, currentNode["alias"].toLowerCase(), 1]);
