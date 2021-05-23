@@ -32,11 +32,11 @@ function UpdateSearchResults(ev)
 
     if (pattern === "")
     {
-        searchResultsDiv.className = "search_results_hidden";
+        searchResultsDiv.className = "search-results-hidden";
         return;
     }
     else
-        searchResultsDiv.className = "search_results_visible";
+        searchResultsDiv.className = "search-results-visible";
 
     let results = Search(pattern);
     let keys = Object.keys(results);
@@ -120,7 +120,7 @@ function Search(pattern)
         let data = nodeSearchData[i];
         if (!(data[2] & searchMask))
             continue;
-        
+
         let searchStr = data[1];
         let textIndex = patternLength - 1;
         let patternIndex = patternLength - 1;
@@ -130,7 +130,7 @@ function Search(pattern)
         while (textIndex < searchStr.length)
         {
             let char = searchStr[textIndex - matchingCharacters];
-            
+
             if (pattern[patternIndex - matchingCharacters] === char)
             {
                 ++matchingCharacters;
@@ -138,7 +138,7 @@ function Search(pattern)
                 if (matchingCharacters == patternLength)
                 {
                     let node = data[0];
-    
+
                     if (!(node["pub_key"] in matches))
                     {
                         matches[node["pub_key"]] = node;
@@ -155,7 +155,7 @@ function Search(pattern)
                 let skipCount = patternData[char];
                 if (!skipCount)
                     skipCount = patternLength;
-                
+
                 skipCount -= matchingCharacters;
                 matchingCharacters = 0;
 
@@ -169,7 +169,7 @@ function Search(pattern)
 
 function SearchStop()
 {
-    searchResultsDiv.className = "search_results_hidden";
+    searchResultsDiv.className = "search-results-hidden";
 }
 
 let connectionCodeToCopy;
@@ -198,30 +198,30 @@ function SelectNode(node, doMoveToNode)
         // shold not happen
         return;
     }
-    
+
     if (timeoutId !== -1)
     {
         window.clearInterval(timeoutId);
         timeoutId = -1;
-        document.getElementById("copy_code_button").innerText = "Copy connection code";
+        document.getElementById("copy-code-button").innerText = "Copy connection code";
     }
 
     DeselectNode();
 
     selectedNode = node;
 
-    let nodeDetailsDiv = document.getElementById("node_details");
-    nodeDetailsDiv.className = "node_details_visible";
+    let nodeDetailsDiv = document.getElementById("node-details");
+    nodeDetailsDiv.className = "node-details-visible";
 
-    let nodeDetailsAlias = document.getElementById("node_details_alias");
+    let nodeDetailsAlias = document.getElementById("node-details-alias");
     nodeDetailsAlias.innerText = node["hasNoAlias"] ? "(not set)" : node["alias"];
-    
-    let nodeDetailsPubkey = document.getElementById("node_details_pubkey");
-    nodeDetailsPubkey.innerText = node["pub_key"];
-    
-    let nodeDetailsIP = document.getElementById("node_details_ip");
 
-    let copyConnectionCodeButton = document.getElementById("copy_code_button");
+    let nodeDetailsPubkey = document.getElementById("node-details-pubkey");
+    nodeDetailsPubkey.innerText = node["pub_key"];
+
+    let nodeDetailsIP = document.getElementById("node-details-ip");
+
+    let copyConnectionCodeButton = document.getElementById("copy-code-button");
     if (node["addresses"].length != 0)
     {
         nodeDetailsIP.innerText = node["addresses"][0]["addr"];
@@ -233,11 +233,11 @@ function SelectNode(node, doMoveToNode)
         nodeDetailsIP.innerText = "Unknown";
         copyConnectionCodeButton.disabled = true;
     }
-    
+
     let channelCount = Object.keys(node["channels"]).length;
-    document.getElementById("node_details_numchannels").innerText = channelCount;
-    document.getElementById("node_details_capacity").innerText = node["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
-    
+    document.getElementById("node-details-numchannels").innerText = channelCount;
+    document.getElementById("node-details-capacity").innerText = node["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
+
     if (doMoveToNode)
         MoveToNode(node);
 
@@ -252,9 +252,9 @@ function DeselectNode()
     if (!selectedNode)
         return;
 
-    let nodeDetailsDiv = document.getElementById("node_details");
-    nodeDetailsDiv.className = "node_details_hidden";
-    
+    let nodeDetailsDiv = document.getElementById("node-details");
+    nodeDetailsDiv.className = "node-details-hidden";
+
     SetNodeUVs(selectedNode["renderData"]["order"] * 108, false);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, texBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, nodeUVs, ctx.STATIC_DRAW);
@@ -265,14 +265,14 @@ function DeselectNode()
 
 function JumpToNodeFromChannels(element)
 {
-    document.getElementById("current_channel_info_overlay").className = "search_options_overlay_hidden";
-    document.getElementById("channels_overlay").className = "search_options_overlay_hidden";
+    document.getElementById("current-channel-info-overlay").className = "search-options-overlay-hidden";
+    document.getElementById("channels-overlay").className = "search-options-overlay-hidden";
     SelectNode(allNodes[element.nodeID], true);
 }
 
 function ShowChannelInfo(show = true)
 {
-    document.getElementById("current_channel_info_overlay").className = show ? "search_options_overlay_visible" : "search_options_overlay_hidden";
+    document.getElementById("current-channel-info-overlay").className = show ? "search-options-overlay-visible" : "search-options-overlay-hidden";
     if (!show)
         return;
 
@@ -280,24 +280,24 @@ function ShowChannelInfo(show = true)
     let node1 = allNodes[currentChannel["node1_pub"]];
     let node2 = allNodes[currentChannel["node2_pub"]];
 
-    document.getElementById("current_channel_id").innerText = this.channelID;
+    document.getElementById("current-channel-id").innerText = this.channelID;
 
-    let node1Element = document.getElementById("current_channel_node1");
+    let node1Element = document.getElementById("current-channel-node1");
     node1Element.innerText = node1["alias"];
     node1Element.nodeID = currentChannel["node1_pub"];
 
-    let node2Element = document.getElementById("current_channel_node2");
+    let node2Element = document.getElementById("current-channel-node2");
     node2Element.innerText = node2["alias"];
     node2Element.nodeID = currentChannel["node2_pub"];
 
-    document.getElementById("current_channel_capacity").innerText = currentChannel["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
-    document.getElementById("current_channel_lastupdate").innerText = new Date(currentChannel["last_update"] * 1000)
+    document.getElementById("current-channel-capacity").innerText = currentChannel["capacity"].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " sat";
+    document.getElementById("current-channel-lastupdate").innerText = new Date(currentChannel["last-update"] * 1000)
                                                                       .toLocaleTimeString(navigator.language, {"year" : "numeric", "month": "short", "day": "2-digit" ,"weekday" : "short"});
 }
 
 function ShowChannels(show)
 {
-    document.getElementById("channels_overlay").className = show ? "search_options_overlay_visible" : "search_options_overlay_hidden";
+    document.getElementById("channels-overlay").className = show ? "search-options-overlay-visible" : "search-options-overlay-hidden";
 
     if (!selectedNode || !show)
         return;
@@ -305,7 +305,7 @@ function ShowChannels(show)
     let channels = selectedNode["channels"];
     let channelCount = Object.keys(channels).length;
 
-    let channelListDiv = document.getElementById("channels_list");
+    let channelListDiv = document.getElementById("channels-list");
     let currentCount = channelListDiv.childElementCount;
 
     if (currentCount < channelCount)
@@ -313,15 +313,15 @@ function ShowChannels(show)
         for (let i = currentCount; i < channelCount; ++i)
         {
             let current = document.createElement("button");
-            current.className = "channels_list_element";
+            current.className = "channels-list-element";
             current.onclick = ShowChannelInfo;
 
             let idDiv = document.createElement("div");
-            idDiv.className = "channels_list_element_id";
+            idDiv.className = "channels-list-element-id";
             current.appendChild(idDiv);
 
             let nameDiv = document.createElement("div");
-            nameDiv.className = "channels_list_element_name";
+            nameDiv.className = "channels-list-element-name";
             current.appendChild(nameDiv);
 
             channelListDiv.appendChild(current);
@@ -351,13 +351,13 @@ function ShowChannels(show)
 
 window.addEventListener("load", function()
 {
-    searchResultsDiv = document.getElementById("search_results");
+    searchResultsDiv = document.getElementById("search-results");
     searchResultButtons = [];
 
     for (let i = 0; i < searchMaxCount; ++i)
     {
         let current = document.createElement("button");
-        current.className = "search_result_element";
+        current.className = "search-result-element";
         current.onclick = function()
         {
             SelectNode(allNodes[current.nodePubKey], true);

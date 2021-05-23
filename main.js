@@ -30,7 +30,7 @@ function Resized()
         FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfTheFuckingLines();
         FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfTheFuckingTexts();
     }
-    
+
     Changed();
 }
 
@@ -43,7 +43,7 @@ function PageLoaded()
         {
             tempNodes = __nodes["nodes"];
             tempChannels = __nodes["edges"];
-    
+
             Resized();
             CalculateNodeData();
 
@@ -55,9 +55,9 @@ function PageLoaded()
             RenderTexts();
             CalculateLines();
             WebglInit();
-            let loadingOverlayStyle = document.getElementById("loading_overlay").style;
+            let loadingOverlayStyle = document.getElementById("loading-overlay").style;
             loadingOverlayStyle.opacity = "0";
-    
+
             window.setTimeout(function()
             {
                 loadingOverlayStyle.display = "none";
@@ -69,8 +69,8 @@ function PageLoaded()
     else
     {
         let request  = new XMLHttpRequest();
-        
-        let textDiv = document.getElementById("loading_text2");
+
+        let textDiv = document.getElementById("loading-text2");
         request.onprogress = function(ev)
         {
             textDiv.innerText = (ev.loaded / 1048576).toFixed(1) + "MB loaded";
@@ -78,7 +78,7 @@ function PageLoaded()
 
         let errorFunction = function()
         {
-            let loadingText = document.getElementById("loading_text");
+            let loadingText = document.getElementById("loading-text");
             loadingText.innerText = "Loading error";
             textDiv.innerText = "See console for details";
         };
@@ -111,7 +111,7 @@ function PageLoaded()
                     RenderTexts();
                     CalculateLines();
                     WebglInit();
-                    let loadingOverlayStyle = document.getElementById("loading_overlay").style;
+                    let loadingOverlayStyle = document.getElementById("loading-overlay").style;
                     loadingOverlayStyle.opacity = "0";
 
                     window.setTimeout(function()
@@ -124,7 +124,7 @@ function PageLoaded()
 
         request.onerror = errorFunction;
 
-        request.open("GET", "https://rompert.com/networkgraphv2", true);
+        request.open("GET", "graph.json", true);
         request.send();
     }
 }
@@ -145,7 +145,7 @@ canvas.addEventListener("mousedown", function(ev)
 
     if (interactLocked)
         return;
-    
+
     if (ev.button === 2)
         isCameraDragging = true;
     else if (ev.button === 0)
@@ -170,7 +170,7 @@ window.addEventListener("mouseup", function(ev)
 {
     if (interactLocked)
         return;
-    
+
     if (ev.button === 2)
     {
         isCameraDragging = false;
@@ -219,7 +219,7 @@ canvas.addEventListener("wheel", function(ev)
 {
     if (interactLocked)
         return;
-    
+
     // positive: zoom out, negative: zoom in
     let prevZoom = zoom;
     if (ev.deltaY > 0)
@@ -231,7 +231,7 @@ canvas.addEventListener("wheel", function(ev)
         zoom = maxZoom;
     else if (zoom < minZoom)
         zoom = minZoom;
-    
+
     cameraOffsetX += (windowWidth * 0.5 - ev.clientX) * (1 / prevZoom - 1 / zoom);
     cameraOffsetY += (windowHeight * 0.5 - ev.clientY) * (1 / zoom - 1 / prevZoom);
 
@@ -244,7 +244,7 @@ function CameraDrag(dx, dy)
 {
     cameraOffsetX += dx / zoom;
     cameraOffsetY -= dy / zoom;
-    
+
     //ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
     Changed();
 }
@@ -271,7 +271,7 @@ function DragNode(node, dx, dy)
         vertexOffsets[startIndex++] = posX;
         vertexOffsets[startIndex++] = posY;
     }
-    
+
     ctx.bindBuffer(ctx.ARRAY_BUFFER, offsetBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, vertexOffsets, ctx.STATIC_DRAW);
 
@@ -289,7 +289,7 @@ function DragNode(node, dx, dy)
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, textAtlases[nodeRenderData["atlasID"]]["offsetBuffer"]);
     ctx.bufferData(ctx.ARRAY_BUFFER, textOffsetBufferData, ctx.STATIC_DRAW);
-    
+
     // update lines (channels)
     FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfTheFuckingLines(node);
 
@@ -320,12 +320,12 @@ function EndDraggingNode(node)
         prevGridStartY = (prevY >> gridSize),
         prevGridEndX = (prevEndPosX >> gridSize),
         prevGridEndY = (prevEndPosY >> gridSize);
-    
+
     let newGridStartX = (posX >> gridSize),
         newGridStartY = (posY >> gridSize),
         newGridEndX = (newEndPosX >> gridSize),
         newGridEndY = (newEndPosY >> gridSize);
-    
+
     if (prevGridStartX != newGridStartX || prevGridStartY != newGridStartY || prevGridEndX != newGridEndX || prevGridEndY != newGridEndY)
     {
         let nodePubKey = node["pub_key"];
@@ -341,7 +341,7 @@ function EndDraggingNode(node)
                     delete currentGridElements[nodePubKey];
             }
         }
-        
+
         for (let x = newGridStartX; x <= newGridEndX; ++x)
         {
             for (let y = newGridStartY; y <= newGridEndY; ++y)
@@ -375,7 +375,7 @@ function MoveToNode(node)
     let targetPosX = node["renderData"]["posX"] + addX;
     let targetPosY = node["renderData"]["posY"] + addY;
     let startPosX = -cameraOffsetX, startPosY = cameraOffsetY;
-    
+
     const steps = 50;
     let currentStepMove = 0;
     let currentStepZoom = -1;
@@ -397,7 +397,7 @@ function MoveToNode(node)
                 targetPosX = node["renderData"]["posX"] + addX;
                 targetPosY = node["renderData"]["posY"] + addY;
             }
-            
+
             if (currentStepMove > steps)
                 t = 1;
             else
@@ -405,7 +405,7 @@ function MoveToNode(node)
                 let percent = currentStepMove / steps;
                 t = Math.sin((percent - 0.5) * Math.PI) * 0.5 + 0.5;
             }
-            
+
             cameraOffsetX = -(startPosX + (targetPosX - startPosX) * t);
             cameraOffsetY = startPosY + (targetPosY - startPosY) * t;
 
@@ -420,7 +420,7 @@ function MoveToNode(node)
         {
             let percent = currentStepZoom / steps;
             let t = Math.sin((percent - 0.5) * Math.PI) * 0.5 + 0.5;
-            
+
             zoom = startZoom + (targetZoom - startZoom) * t;
 
             ++currentStepZoom;
@@ -430,7 +430,7 @@ function MoveToNode(node)
             interactLocked = false;
         else
             window.requestAnimationFrame(Update);
-        
+
         //ctx.uniform3f(cameraOffsetLoc, cameraOffsetX * 2, cameraOffsetY * 2, zoom);
         Changed();
     }
@@ -457,11 +457,11 @@ function GetNodeFromMousePos(x, y)
         for (let node in currentGridElements)
         {
             let currentNodeData = currentGridElements[node]["renderData"];
-            
+
             let startPosX = currentNodeData["posX"], startPosY = currentNodeData["posY"];
             let endPosX = startPosX + (textPaddingX * 2 + currentNodeData["textWidth"]) * coordMultiplier;
             let endPosY = startPosY + (boxSizeY * 2 + boxHeight) * coordMultiplier;
-            
+
             if (startPosY < posY && endPosY > posY && startPosX < posX && endPosX > posX)
                 return currentGridElements[node];
         }
@@ -541,7 +541,7 @@ function CalculateNodeData()
             let node2object = allNodes[node2];
             node2object["channels"][channelId] = currentChannel;
             allChannels[channelId] = currentChannel;
-            
+
             if (!node1object["hasChannelWith"][node2])
             {
                 node1object["hasChannelWith"][node2] = true;
@@ -706,7 +706,7 @@ function StartPhysicsSimulation(start)
             {
                 let ch = currentNode["renderedChannels"][channel];
                 let otherNode = allNodes[(ch["node1_pub"] == currentPubkey) ? ch["node2_pub"] : ch["node1_pub"]];
-                
+
                 let ox = otherNode["renderData"]["posX"], oy = otherNode["renderData"]["posY"];
 
                 let distX = ox - posX, distY = oy - posY;
@@ -726,7 +726,7 @@ function StartPhysicsSimulation(start)
             currentNode["velocityX"] += dx * multiplier;
             currentNode["velocityY"] += dy * multiplier;
         }
-        
+
         let startIndex = 0;
         for (let i = 0; i < allNodeCount; ++i)
         {
@@ -743,7 +743,7 @@ function StartPhysicsSimulation(start)
                 vertexOffsets[startIndex++] = x;
                 vertexOffsets[startIndex++] = y;
             }
-            
+
             let currentOffsetX = currentNode["renderData"]["posX"] * 2;
             let currentOffsetY = currentNode["renderData"]["posY"] * -2 - (baseFontSize * 2 + textPaddingY * 2 + 30) * coordMultiplier;
             let textOffsetBufferData = textAtlases[currentNode["renderData"]["atlasID"]]["offsetBufferData"];
@@ -757,7 +757,7 @@ function StartPhysicsSimulation(start)
 
         ctx.bindBuffer(ctx.ARRAY_BUFFER, offsetBuffer);
         ctx.bufferData(ctx.ARRAY_BUFFER, vertexOffsets, ctx.STATIC_DRAW);
-    
+
         for (let a in textAtlases)
         {
             ctx.bindBuffer(ctx.ARRAY_BUFFER, textAtlases[a]["offsetBuffer"]);
@@ -831,7 +831,7 @@ function CalculateLineColors(colorBufferData)
             colorBufferData[colorBufferIndex++] = b1;
             colorBufferData[colorBufferIndex++] = lineAlpha;
         }
-        
+
         for (let j = 0; j < target; ++j)
         {
             colorBufferData[colorBufferIndex++] = r2;
@@ -851,7 +851,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 {
     let vertexBufferData = lineData.vertexBufferData;
     let addY = (boxSizeY * 2 + boxHeight) * coordMultiplier;
-    
+
     let currentlyUpdatedChannels = updateOnlyThisNode ? updateOnlyThisNode["renderedChannels"] : renderedChannelsByIndex;
 
     // precalculated values
@@ -865,7 +865,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 
         let node1 = allNodes[currentChannel["node1_pub"]];
         let node2 = allNodes[currentChannel["node2_pub"]];
-        
+
         let vertexIndex = currentChannel["order"] * 24 * lineSegments;
 
         let renderData1 = node1["renderData"], renderData2 = node2["renderData"];
@@ -876,29 +876,29 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 
         let posX1 = (endPosX1 - startPosX1) * 0.5 + startPosX1;
         let posY1 = (endPosY1 - startPosY1) * 0.5 + startPosY1;
-        
+
         let startPosX2 = renderData2["posX"], startPosY2 = renderData2["posY"];
         let endPosX2 = startPosX2 + (boxSizeX * 2 + renderData2["textWidth"]) * coordMultiplier;
         let endPosY2 = startPosY2 + addY;
 
         let posX2 = (endPosX2 - startPosX2) * 0.5 + startPosX2;
         let posY2 = (endPosY2 - startPosY2) * 0.5 + startPosY2;
-        
+
         let angle = Math.atan2(posY2 - posY1, posX2 - posX1);
 
         let sin = Math.sin(angle), cos = Math.cos(angle);
         // bottom right
         let x1 = (posX1 + lineWidth * sin) * 2 - wwtcm;
         let y1 = (posY1 - lineWidth * cos) * -2 + whtcm
-        
+
         // top right
         let x3 = (posX2 + lineWidth * sin) * 2 - wwtcm;
         let y3 = (posY2 - lineWidth * cos) * -2 + whtcm;
-        
+
         // bottom left
         let x2 = (posX1 - lineWidth * sin) * 2 - wwtcm;
         let y2 = (posY1 + lineWidth * cos) * -2 + whtcm;
-        
+
         // top left
         let x4 = (posX2 - lineWidth * sin) * 2 - wwtcm;
         let y4 = (posY2 + lineWidth * cos) * -2 + whtcm;
@@ -912,18 +912,18 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
             // bottom middle
             let newX13 = prevX13 + addX13;
             let newY13 = prevY13 + addY13;
-    
+
             // top middle
             let newX24 = prevX24 + addX24;
             let newY24 = prevY24 + addY24;
-            
+
             vertexBufferData[vertexIndex++] = prevX13;
             vertexBufferData[vertexIndex++] = prevY13;
             vertexBufferData[vertexIndex++] = prevX24;
             vertexBufferData[vertexIndex++] = prevY24;
             vertexBufferData[vertexIndex++] = newX24;
             vertexBufferData[vertexIndex++] = newY24;
-            
+
             vertexBufferData[vertexIndex++] = prevX13;
             vertexBufferData[vertexIndex++] = prevY13;
             vertexBufferData[vertexIndex++] = newX24;
@@ -937,7 +937,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
             prevY24 = newY24;
         }
     }
-    
+
     ctx.bindBuffer(ctx.ARRAY_BUFFER, lineData.vertexBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, vertexBufferData, ctx.STATIC_DRAW);
 }
@@ -951,7 +951,7 @@ function DrawLines()
     ctx.enableVertexAttribArray(colorLocLine);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, lineData.colorBuffer);
     ctx.vertexAttribPointer(colorLocLine, 4, ctx.FLOAT, false, 0, 0);
-    
+
     ctx.drawArrays(ctx.TRIANGLES, 0, lineData.vertexCount * lineSegments);
 }
 
@@ -961,7 +961,7 @@ function Changed()
 {
     if (changed)
         return;
-    
+
     if (!webglInitialized)
     {
         window.requestAnimationFrame(Changed);
@@ -1008,11 +1008,11 @@ function DrawNodes()
     ctx.enableVertexAttribArray(offsetLoc);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, offsetBuffer);
     ctx.vertexAttribPointer(offsetLoc, 2, ctx.FLOAT, false, 0, 0);
-    
+
     ctx.enableVertexAttribArray(colorLoc);
     ctx.bindBuffer(ctx.ARRAY_BUFFER, colorBuffer);
     ctx.vertexAttribPointer(colorLoc, 4, ctx.FLOAT, false, 0, 0);
-    
+
     ctx.bindTexture(ctx.TEXTURE_2D, texture);
 
     ctx.drawArrays(ctx.TRIANGLES, 0, allNodeCount * 6 * 9);
@@ -1032,11 +1032,11 @@ function DrawTexts()
         ctx.enableVertexAttribArray(tLoc);
         ctx.bindBuffer(ctx.ARRAY_BUFFER, currentData["uvBuffer"]);
         ctx.vertexAttribPointer(tLoc, 2, ctx.FLOAT, false, 0, 0);
-        
+
         ctx.enableVertexAttribArray(offsetLoc);
         ctx.bindBuffer(ctx.ARRAY_BUFFER, currentData["offsetBuffer"]);
         ctx.vertexAttribPointer(offsetLoc, 2, ctx.FLOAT, false, 0, 0);
-        
+
         ctx.enableVertexAttribArray(colorLoc);
         ctx.bindBuffer(ctx.ARRAY_BUFFER, currentData["colorBuffer"]);
         ctx.vertexAttribPointer(colorLoc, 4, ctx.FLOAT, false, 0, 0);
@@ -1099,10 +1099,10 @@ function CreateTextureFromCanvas(vertexData, uvData, offsetData, colorData)
     let currentUVBuffer = ctx.createBuffer();
     let currentOffsetBuffer = ctx.createBuffer();
     let currentColorBuffer = ctx.createBuffer();
-    
+
     ctx.bindBuffer(ctx.ARRAY_BUFFER, currentVertexBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, vertexBufferData, ctx.STATIC_DRAW);
-    
+
     ctx.bindBuffer(ctx.ARRAY_BUFFER, currentUVBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, uvBufferData, ctx.STATIC_DRAW);
 
@@ -1149,10 +1149,10 @@ function RenderTexts()
     let uvData = [];
     let offsetData = [];
     let colorData = [];
-    
+
     let left = (textPaddingX * windowWidthInverse * 2 - 1) * coordMultiplier;
     let bottom = 1 * coordMultiplier;
-    
+
     for (let i = 0; i < allNodeCount; ++i)
     {
         let currentNode = allNodesByIndex[i];
@@ -1197,7 +1197,7 @@ function RenderTexts()
         vertexData.push(bottom);
         vertexData.push(left);
         vertexData.push(top);
-        
+
         vertexData.push(right);
         vertexData.push(bottom);
         vertexData.push(right);
@@ -1216,7 +1216,7 @@ function RenderTexts()
         uvData.push(uvTop);
         uvData.push(uvLeft);
         uvData.push(uvBottom);
-            
+
         uvData.push(uvRight);
         uvData.push(uvTop);
         uvData.push(uvRight);
@@ -1273,7 +1273,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 
     let left = (textPaddingX * windowWidthInverse * 2 - 1) * coordMultiplier;
     let bottom = 1 * coordMultiplier;
-    
+
     let index = 0;
     for (let i = 0; i < textAtlasCount; ++i)
     {
@@ -1295,7 +1295,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
             vertexData.push(bottom);
             vertexData.push(left);
             vertexData.push(top);
-            
+
             vertexData.push(right);
             vertexData.push(bottom);
             vertexData.push(right);
@@ -1305,7 +1305,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
         }
 
         let vertexBufferData = new Float32Array(vertexData);
-    
+
         ctx.bindBuffer(ctx.ARRAY_BUFFER, currentAtlas["vertexBuffer"]);
         ctx.bufferData(ctx.ARRAY_BUFFER, vertexBufferData, ctx.STATIC_DRAW);
     }
@@ -1314,7 +1314,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVerticesOfT
 function Loaded()
 {
     InitWebglData();
-    
+
     for (let i = 0; i < allNodeCount; ++i)
     {
         let currentNode = allNodesByIndex[i];
@@ -1388,7 +1388,7 @@ function FinalizeSetPosition()
     for (let i = 0; i < textAtlasCount; ++i)
     {
         let currentData = textAtlases[i];
-        
+
         ctx.bindBuffer(ctx.ARRAY_BUFFER, currentData["offsetBuffer"]);
         ctx.bufferData(ctx.ARRAY_BUFFER, currentData["offsetBufferData"], ctx.STATIC_DRAW);
     }
@@ -1405,14 +1405,14 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
 
     let left0 = -1 * coordMultiplier;
     let left1 = left0 + (boxSizeX * 2 * windowWidthInverse) * coordMultiplier;
-    
+
     let bottom0 = 1 * coordMultiplier;
     let bottom1 = bottom0 - boxSizeY * windowHeightInverse * 2 * coordMultiplier;
     let bottom2 = bottom0 - (boxSizeY + boxHeight) * windowHeightInverse * 2 * coordMultiplier;
     let bottom3 = bottom0 - (boxSizeY * 2 + boxHeight) * windowHeightInverse * 2 * coordMultiplier;
 
     let widthAddPrecalc = textPaddingX * 2 - boxSizeX * 2;
-    
+
     for (let i = 0; i < count; ++i)
     {
         let currentNodeTextWidth = allNodesByIndex[i].renderData["textWidth"] + widthAddPrecalc;
@@ -1426,7 +1426,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom0;
-        
+
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom0;
         vertices[vertexIndex++] = left0;
@@ -1441,7 +1441,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom0;
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom1;
-        
+
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom0;
         vertices[vertexIndex++] = left1;
@@ -1456,7 +1456,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left3;
         vertices[vertexIndex++] = bottom0;
-        
+
         vertices[vertexIndex++] = left3;
         vertices[vertexIndex++] = bottom0;
         vertices[vertexIndex++] = left2;
@@ -1471,7 +1471,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left0;
         vertices[vertexIndex++] = bottom2;
-        
+
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left0;
@@ -1486,7 +1486,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom2;
-        
+
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left1;
@@ -1501,7 +1501,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom2;
-        
+
         vertices[vertexIndex++] = left3;
         vertices[vertexIndex++] = bottom1;
         vertices[vertexIndex++] = left2;
@@ -1516,7 +1516,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left0;
         vertices[vertexIndex++] = bottom3;
-        
+
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left0;
@@ -1531,7 +1531,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left1;
         vertices[vertexIndex++] = bottom3;
-        
+
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left1;
@@ -1546,7 +1546,7 @@ function FuckingWindowWasFuckingResizedSoFuckingRecalculateTheFuckingVertices()
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left2;
         vertices[vertexIndex++] = bottom3;
-        
+
         vertices[vertexIndex++] = left3;
         vertices[vertexIndex++] = bottom2;
         vertices[vertexIndex++] = left2;
@@ -1572,14 +1572,14 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvTop;
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvBottom;
-    
+
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvTop;
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvBottom;
-    
+
     // top
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvTop;
@@ -1587,14 +1587,14 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvTop;
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvBottom;
-    
+
     nodeUVs[uvIndex++] = uvRight + 0.01;
     nodeUVs[uvIndex++] = uvTop;
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvRight + 0.01;
     nodeUVs[uvIndex++] = uvBottom;
-    
+
     // top right
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvTop;
@@ -1602,7 +1602,7 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvTop;
-    
+
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvTop;
     nodeUVs[uvIndex++] = uvRight;
@@ -1617,7 +1617,7 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvBottom - 0.01;
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvBottom;
-    
+
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvBottom - 0.01;
     nodeUVs[uvIndex++] = uvLeft;
@@ -1632,7 +1632,7 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvRight + 0.01;
     nodeUVs[uvIndex++] = uvBottom - 0.01;
-    
+
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvBottom - 0.01;
     nodeUVs[uvIndex++] = uvRight + 0.01;
@@ -1647,7 +1647,7 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvBottom - 0.01;
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvBottom;
-    
+
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvBottom - 0.01;
     nodeUVs[uvIndex++] = uvRight;
@@ -1662,14 +1662,14 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvTop;
-    
+
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvTop;
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvTop;
-    
+
     // bottom
     nodeUVs[uvIndex++] = uvRight + 0.01;
     nodeUVs[uvIndex++] = uvBottom;
@@ -1677,7 +1677,7 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvTop;
-    
+
     nodeUVs[uvIndex++] = uvRight + 0.01;
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvRight;
@@ -1692,7 +1692,7 @@ function SetNodeUVs(uvIndex, isHighlighted)
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvRight;
     nodeUVs[uvIndex++] = uvTop;
-    
+
     nodeUVs[uvIndex++] = uvLeft;
     nodeUVs[uvIndex++] = uvBottom;
     nodeUVs[uvIndex++] = uvRight;
@@ -1737,7 +1737,7 @@ function InitWebglData()
 
     ctx.bindBuffer(ctx.ARRAY_BUFFER, offsetBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, vertexOffsets, ctx.STATIC_DRAW);
-    
+
     ctx.bindBuffer(ctx.ARRAY_BUFFER, colorBuffer);
     ctx.bufferData(ctx.ARRAY_BUFFER, colors, ctx.STATIC_DRAW);
 
@@ -1785,7 +1785,7 @@ function WebglInit()
         gl_FragColor = texture2D(sampler0, vTex, -0.8) * color;
     }
     `;
-    
+
     const vertexShaderLine = `
     attribute vec2 aVertex;
     attribute vec4 col;
@@ -1810,7 +1810,7 @@ function WebglInit()
 
     ctx.enable(ctx.BLEND);
     ctx.blendFunc(ctx.SRC_ALPHA, ctx.ONE_MINUS_SRC_ALPHA);
-    
+
     ctx.enable(ctx.CULL_FACE);
     ctx.cullFace(ctx.BACK);
 
@@ -1857,7 +1857,7 @@ function WebglInit()
     colorLocLine = ctx.getAttribLocation(lineProgram, "col");
     cameraOffsetLocLine = ctx.getUniformLocation(lineProgram, "cameraOffset");
     windowSizeLocLine = ctx.getUniformLocation(lineProgram, "windowSize");
-    
+
 
     let texImage = new Image();
     let whiteImage = new Image();
@@ -1869,7 +1869,7 @@ function WebglInit()
     {
         if (++currentImageCount != targetImageCount)
             return;
-        
+
         texture = ctx.createTexture();
         ctx.bindTexture(ctx.TEXTURE_2D, texture);
         ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_WRAP_S, ctx.CLAMP_TO_EDGE);
@@ -1908,7 +1908,7 @@ function Intersect(p1x1, p1y1, p1x2, p1y2, p2x1, p2y1, p2x2, p2y2)
 
     if (d1 < 0 == d2 < 0)
         return false;
-        
+
     a1 = p2y2 - p2y1;
     b1 = p2x1 - p2x2;
 
