@@ -4,7 +4,7 @@ const baseFontSize = 48;
 const coordMultiplier = 0.0625; // reduce this for increased precision
 
 const zoomSpeed = 1.1;
-const startingZoom = 0.125 / coordMultiplier;
+const startingZoom = 0.125 / coordMultiplier * 100;
 const maxZoom = startingZoom * 1000, minZoom = startingZoom * 0.001;
 
 const vertexSize = 2;
@@ -42,7 +42,7 @@ window.addEventListener("load", async () =>
     const canvas = <HTMLCanvasElement>document.getElementById("canvas");
     const ctx = canvas.getContext("webgl")!;
 
-    const textCanvas = <HTMLCanvasElement>document.createElement("canvas");
+    const textCanvas = document.createElement("canvas");
     const tctx = textCanvas.getContext("2d")!;
 
     document.getElementById("loading-overlay")!.style.display = "none";
@@ -59,7 +59,7 @@ window.addEventListener("load", async () =>
 
     const nodeData = await LoadNodeData();
 
-    const { standard, text, lines } = (() =>
+    const { nodeRenderer, textRenderer, lineRenderer } = (() =>
     {
         // WebGL init
 
@@ -68,7 +68,7 @@ window.addEventListener("load", async () =>
 
         // TODO: enable this in the final version
         // there should be no need to do backface culling,
-        // since everything is 2d, and every triangel is rendered anyways
+        // since everything is 2d, and every triangle is rendered anyways
         // ctx.disable(ctx.CULL_FACE);
         ctx.enable(ctx.CULL_FACE);
         ctx.cullFace(ctx.BACK);
@@ -76,13 +76,15 @@ window.addEventListener("load", async () =>
         ctx.clearColor(0.2, 0.2, 0.2, 1);
 
         return {
-            standard: new NodeRenderer(new StandardProgram(ctx)),
-            text: new TextRenderer(new StandardProgram(ctx)),
-            lines: new LineRenderer(new LinesProgram(ctx))
+            nodeRenderer: new NodeRenderer(ctx),
+            textRenderer: new TextRenderer(ctx, tctx),
+            lineRenderer: new LineRenderer(ctx)
         };
     })();
 
-    lines.setData(nodeData);
+    lineRenderer.setData(nodeData);
+    nodeRenderer.setData(nodeData);
+    textRenderer.setData(nodeData);
 
     let shouldRender = true;
 
@@ -116,9 +118,9 @@ window.addEventListener("load", async () =>
 
         shouldRender = false;
 
-        lines.render(cameraRenderData);
-        standard.render(cameraRenderData);
-        text.render(cameraRenderData);
+        lineRenderer.render(cameraRenderData);
+        nodeRenderer.render(cameraRenderData);
+        textRenderer.render(cameraRenderData);
     }
 
     RenderLoop();

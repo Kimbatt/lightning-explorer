@@ -113,6 +113,16 @@ void main()
     }
 }
 
+interface StandardRenderData
+{
+    vertexBuffer: WebGLBuffer;
+    uvBuffer: WebGLBuffer;
+    offsetBuffer: WebGLBuffer;
+    colorBuffer: WebGLBuffer;
+    texture: WebGLTexture | null;
+    count: number;
+}
+
 class StandardProgram
 {
     // attributes
@@ -128,15 +138,13 @@ class StandardProgram
     private program: WebGLProgram;
     private ctx: WebGLRenderingContext;
 
+    private vertexCount = 0;
+
     // buffers
     private vertexBuffer: WebGLBuffer;
     private uvBuffer: WebGLBuffer;
     private offsetBuffer: WebGLBuffer;
     private colorBuffer: WebGLBuffer;
-
-    // textures
-    private texture: WebGLTexture;
-    private whiteTexture: WebGLTexture;
 
     constructor(ctx: WebGLRenderingContext)
     {
@@ -153,7 +161,7 @@ uniform vec3 cameraOffset; // x, y: camera pos, z: zoom
 uniform vec2 windowSize;
 void main()
 {
-    gl_Position = vec4((aVertex + (aVertexOffset + cameraOffset.xy) * windowSize) * cameraOffset.z, 0.0, 1.0);
+    gl_Position = vec4(((aVertex + aVertexOffset + cameraOffset.xy) * windowSize) * cameraOffset.z, 0.0, 1.0);
     vUV = aUV;
     vColor = aCol;
 }
@@ -196,26 +204,87 @@ void main()
 
         this.cameraOffsetLoc = ctx.getUniformLocation(this.program, "cameraOffset") ?? WebGLThrowError("cameraOffset uniform location");
         this.windowSizeLoc = ctx.getUniformLocation(this.program, "windowSize") ?? WebGLThrowError("windowSize uniform location");
+    }
 
-        this.texture = ctx.createTexture()!;
-        this.whiteTexture = ctx.createTexture()!;
+    public loadImageToTexture(src: string, minFilter?: number, magFilter?: number)
+    {
+        const targetTexture = this.ctx.createTexture() ?? WebGLThrowError("targetTexture");
 
-        function LoadImage(src: string, targetTexture: WebGLTexture, minFilter?: number, magFilter?: number)
+        const image = new Image();
+        image.src = src;
+        image.onload = () =>
         {
-            const image = new Image();
-            image.src = src;
-            image.onload = () =>
-            {
-                ctx.bindTexture(ctx.TEXTURE_2D, targetTexture);
-                ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_WRAP_S, ctx.CLAMP_TO_EDGE);
-                ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_WRAP_T, ctx.CLAMP_TO_EDGE);
-                ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MAG_FILTER, magFilter ?? ctx.LINEAR);
-                ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MIN_FILTER, minFilter ?? ctx.LINEAR);
-                ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, ctx.RGBA, ctx.UNSIGNED_BYTE, image);
-            };
-        }
+            this.ctx.bindTexture(this.ctx.TEXTURE_2D, targetTexture);
+            this.ctx.texParameteri(this.ctx.TEXTURE_2D, this.ctx.TEXTURE_WRAP_S, this.ctx.CLAMP_TO_EDGE);
+            this.ctx.texParameteri(this.ctx.TEXTURE_2D, this.ctx.TEXTURE_WRAP_T, this.ctx.CLAMP_TO_EDGE);
+            this.ctx.texParameteri(this.ctx.TEXTURE_2D, this.ctx.TEXTURE_MAG_FILTER, magFilter ?? this.ctx.LINEAR);
+            this.ctx.texParameteri(this.ctx.TEXTURE_2D, this.ctx.TEXTURE_MIN_FILTER, minFilter ?? this.ctx.LINEAR);
+            this.ctx.texImage2D(this.ctx.TEXTURE_2D, 0, this.ctx.RGBA, this.ctx.RGBA, this.ctx.UNSIGNED_BYTE, image);
+        };
 
-        LoadImage("texture.png", this.texture);
-        LoadImage("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", this.whiteTexture);
+        return targetTexture;
+    }
+
+    public setData(vertices: Float32Array, uvs: Float32Array, offsets: Float32Array, colors: Float32Array)
+    {
+        CheckMultipleOf("vertices", vertices, vertexSize);
+        CheckMultipleOf("colors", colors, colorSize);
+
+        this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.vertexBuffer);
+        this.ctx.bufferData(this.ctx.ARRAY_BUFFER, vertices, this.ctx.STATIC_DRAW);
+
+        this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.uvBuffer);
+        this.ctx.bufferData(this.ctx.ARRAY_BUFFER, uvs, this.ctx.STATIC_DRAW);
+
+        this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.offsetBuffer);
+        this.ctx.bufferData(this.ctx.ARRAY_BUFFER, offsets, this.ctx.STATIC_DRAW);
+
+        this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.colorBuffer);
+        this.ctx.bufferData(this.ctx.ARRAY_BUFFER, colors, this.ctx.STATIC_DRAW);
+
+        this.vertexCount = vertices.length / vertexSize;
+    }
+
+    public render(renderData: CameraRenderData)
+    {
+        this.renderMultiple(renderData, [{
+            vertexBuffer: this.vertexBuffer,
+            uvBuffer: this.uvBuffer,
+            offsetBuffer: this.offsetBuffer,
+            colorBuffer: this.colorBuffer,
+            texture: null,
+            count: this.vertexCount
+        }]);
+    }
+
+    public renderMultiple(cameraRenderData: CameraRenderData, renderData: StandardRenderData[])
+    {
+        this.ctx.useProgram(this.program);
+
+        this.ctx.uniform3f(this.cameraOffsetLoc, cameraRenderData.cameraOffsetX * 2, cameraRenderData.cameraOffsetY * 2, cameraRenderData.zoom);
+        this.ctx.uniform2f(this.windowSizeLoc, cameraRenderData.windowWidthInverse, cameraRenderData.windowHeightInverse);
+
+        for (const data of renderData)
+        {
+            this.ctx.enableVertexAttribArray(this.vertexLoc);
+            this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, data.vertexBuffer);
+            this.ctx.vertexAttribPointer(this.vertexLoc, vertexSize, this.ctx.FLOAT, false, 0, 0);
+
+            this.ctx.enableVertexAttribArray(this.uvLoc);
+            this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, data.uvBuffer);
+            this.ctx.vertexAttribPointer(this.uvLoc, uvSize, this.ctx.FLOAT, false, 0, 0);
+
+            this.ctx.enableVertexAttribArray(this.offsetLoc);
+            this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, data.offsetBuffer);
+            this.ctx.vertexAttribPointer(this.offsetLoc, 2, this.ctx.FLOAT, false, 0, 0);
+
+            this.ctx.enableVertexAttribArray(this.colorLoc);
+            this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, data.colorBuffer);
+            this.ctx.vertexAttribPointer(this.colorLoc, colorSize, this.ctx.FLOAT, false, 0, 0);
+
+            this.ctx.bindTexture(this.ctx.TEXTURE_2D, data.texture);
+
+            this.ctx.drawArrays(this.ctx.TRIANGLES, 0, data.count);
+        }
     }
 }
