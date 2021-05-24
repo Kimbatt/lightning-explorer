@@ -4,7 +4,7 @@ const baseFontSize = 48;
 const coordMultiplier = 0.0625; // reduce this for increased precision
 
 const zoomSpeed = 1.1;
-const startingZoom = 0.125 / coordMultiplier * 100;
+const startingZoom = 0.25 / coordMultiplier * 100;
 const maxZoom = startingZoom * 1000, minZoom = startingZoom * 0.001;
 
 const vertexSize = 2;
@@ -57,7 +57,6 @@ window.addEventListener("load", async () =>
         zoom: startingZoom
     };
 
-    const nodeData = await LoadNodeData();
 
     const { nodeRenderer, textRenderer, lineRenderer } = (() =>
     {
@@ -82,9 +81,11 @@ window.addEventListener("load", async () =>
         };
     })();
 
+    const [nodeData] = await Promise.all([LoadNodeData(), nodeRenderer.loadTexture()]);
+
     lineRenderer.setData(nodeData);
-    nodeRenderer.setData(nodeData);
     textRenderer.setData(nodeData);
+    nodeRenderer.setData(nodeData, textRenderer.textRenderData);
 
     let shouldRender = true;
 

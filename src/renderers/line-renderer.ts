@@ -1,5 +1,5 @@
 
-class LineRenderer implements Renderer
+class LineRenderer
 {
     private program: LinesProgram;
 

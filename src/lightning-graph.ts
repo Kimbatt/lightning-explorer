@@ -7,7 +7,7 @@ interface LightningNode
     color: number; // 24 bits, top 8 bits: red, middle 8 bits: green, bottom 8 bits: blue
     positionX: number;
     positionY: number;
-    alias: string | null;
+    alias: string;
     addresses: string[];
     channels: LightningChannel[];
     neighbors: Set<LightningNode>; // each pair of nodes is present only once in the entire graph, the neighbor is only added here if it has a higher index
@@ -170,7 +170,7 @@ async function LoadNodeData(): Promise<LightningGraphData>
             color,
             positionX,
             positionY,
-            alias: alias === "" ? null : alias,
+            alias: alias || nodePubKey.substr(0, 20), // empty string is false, so it is also replaced
             addresses,
             channels: [],
             neighbors: new Set<LightningNode>()

@@ -92,16 +92,20 @@ function WriteString(str)
 
 WriteUint32(0);
 
+const phi = 1 + Math.sqrt(5) / 2;
 function CalculateNodePosition(index)
 {
-    const spacing = 2;
-    const angle = index / 10;
-    const c = Math.cos(angle);
-    const s = Math.sin(angle);
+    const a = phi * 0.5;
+    const b = 0.03;
+    const t = Math.log(index + 1) * 15;
+
+    const r = a * Math.exp(b * t);
+    const c = Math.cos(t);
+    const s = Math.sin(t);
 
     return {
-        x: c * angle * spacing,
-        y: s * angle * spacing
+        x: c * r,
+        y: s * r
     };
 }
 

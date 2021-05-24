@@ -1,187 +1,362 @@
 
-class NodeRenderer implements Renderer
+class NodeRenderer
 {
     private program: StandardProgram;
 
-    private nodeTexture: WebGLTexture;
-    private whiteTexture: WebGLTexture;
+    private nodeTexture: WebGLTexture | null = null;
 
     constructor(ctx: WebGLRenderingContext)
     {
         this.program = new StandardProgram(ctx);
+    }
 
-        this.nodeTexture = this.program.loadImageToTexture("texture.png");
-        this.whiteTexture = this.program.loadImageToTexture("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=");
+    public async loadTexture()
+    {
+        if (this.nodeTexture === null)
+        {
+            this.nodeTexture = await this.program.loadImageToTexture("texture.png");
+        }
     }
 
     public render(cameraRenderData: CameraRenderData)
     {
-        this.program.render(cameraRenderData);
+        this.program.render(cameraRenderData, this.nodeTexture);
     }
 
-    public setData(data: LightningGraphData)
+    public setData(data: LightningGraphData, textRenderData: TextRenderData[])
     {
+        const nodeCount = data.nodes.length;
 
-    //     const nodeCount = data.nodes.length;
+        // 6 vertices per "square", 9 "squares" in a 3x3 grid
+        const vertices = new Float32Array(nodeCount * vertexSize * 6 * 9);
+        let vertexIndex = 0;
+        const uvs = new Float32Array(nodeCount * uvSize * 6 * 9);
+        let uvIndex = 0;
+        const offsets = new Float32Array(nodeCount * vertexSize * 6 * 9);
+        let offsetIndex = 0;
+        const offsetCountPerNode = 2 * 6 * 9; // 2 - offset size
 
-    //     let vertices = new Float32Array(nodeCount * 12 * 9);
-    //     let vertexIndex = 0;
+        /*
 
-    //     let left0 = -1 * coordMultiplier;
-    //     let left1 = left0 + (boxSizeX * 2 * windowWidthInverse) * coordMultiplier;
+          left0                left2
+            +---+----------------+---+ bottom3
+            |   |                |   |
+    bottom2 +---+----------------+---+
+            |   |                |   |
+            |   |      text      |   |
+            |   |                |   |
+            +---+----------------+---+ bottom1
+            |   |                |   |
+    bottom0 +---+----------------+---+
+          left1                left3
 
-    //     let bottom0 = 1 * coordMultiplier;
-    //     let bottom1 = bottom0 - boxSizeY * windowHeightInverse * 2 * coordMultiplier;
-    //     let bottom2 = bottom0 - (boxSizeY + boxHeight) * windowHeightInverse * 2 * coordMultiplier;
-    //     let bottom3 = bottom0 - (boxSizeY * 2 + boxHeight) * windowHeightInverse * 2 * coordMultiplier;
+        */
 
-    //     let widthAddPrecalc = textPaddingX * 2 - boxSizeX * 2;
+        for (let i = 0; i < data.nodes.length; ++i)
+        {
+            const node = data.nodes[i];
+            const textData = textRenderData[i];
 
-    //     for (let i = 0; i < count; ++i)
-    //     {
-    //         let currentNodeTextWidth = allNodesByIndex[i].renderData["textWidth"] + widthAddPrecalc;
-    //         let left2 = left0 + (boxSizeX + currentNodeTextWidth) * 2 * windowWidthInverse * coordMultiplier;
-    //         let left3 = left0 + (boxSizeX * 2 + currentNodeTextWidth) * 2 * windowWidthInverse * coordMultiplier;
+            const left0 = -textData.halfSizeX - nodeBorderSizeX;
+            const left1 = -textData.halfSizeX;
+            const left2 = textData.halfSizeX;
+            const left3 = textData.halfSizeX + nodeBorderSizeX;
 
-    //         // top left
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom0;
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom0;
+            const bottom3 = -textData.halfSizeY - nodeBorderSizeY;
+            const bottom2 = -textData.halfSizeY;
+            const bottom1 = textData.halfSizeY;
+            const bottom0 = textData.halfSizeY + nodeBorderSizeY;
 
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom0;
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom1;
+            // top left
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom0;
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom0;
 
-    //         // top
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom0;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom0;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom0;
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom1;
 
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom0;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom1;
+            // top
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom0;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom0;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom1;
 
-    //         // top right
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom0;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom0;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom0;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom1;
 
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom0;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom1;
+            // top right
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom0;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom0;
 
-    //         // left
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom0;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom1;
 
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom2;
+            // left
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom2;
 
-    //         // center
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom2;
 
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom2;
+            // center
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom2;
 
-    //         // right
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom2;
 
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom1;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom2;
+            // right
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom2;
 
-    //         // bottom left
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom3;
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom1;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom2;
 
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left0;
-    //         vertices[vertexIndex++] = bottom3;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom3;
+            // bottom left
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom3;
 
-    //         // bottom
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom3;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left0;
+            vertices[vertexIndex++] = bottom3;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom3;
 
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left1;
-    //         vertices[vertexIndex++] = bottom3;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom3;
+            // bottom
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom3;
 
-    //         // bottom right
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom3;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left1;
+            vertices[vertexIndex++] = bottom3;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom3;
 
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom2;
-    //         vertices[vertexIndex++] = left2;
-    //         vertices[vertexIndex++] = bottom3;
-    //         vertices[vertexIndex++] = left3;
-    //         vertices[vertexIndex++] = bottom3;
-    //     }
+            // bottom right
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom3;
 
-    //     //ctx.enableVertexAttribArray(vLoc);
-    //     ctx.bindBuffer(ctx.ARRAY_BUFFER, vertexBuffer);
-    //     ctx.bufferData(ctx.ARRAY_BUFFER, vertices, ctx.STATIC_DRAW);
-    //     //ctx.vertexAttribPointer(vLoc, 2, ctx.FLOAT, false, 0, 0);
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom2;
+            vertices[vertexIndex++] = left2;
+            vertices[vertexIndex++] = bottom3;
+            vertices[vertexIndex++] = left3;
+            vertices[vertexIndex++] = bottom3;
+
+            uvIndex = this.setNodeUVs(uvs, uvIndex, false);
+
+            for (let j = 0; j < offsetCountPerNode; ++j)
+            {
+                offsets[offsetIndex++] = node.positionX;
+                offsets[offsetIndex++] = node.positionY;
+            }
+        }
+
+        this.program.setData(vertices, uvs, offsets);
+    }
+
+    private setNodeUVs(nodeUVs: Float32Array, uvIndex: number, isHighlighted: boolean)
+    {
+        const offsetX = isHighlighted ? 0.5 : 0;
+        const uvLeft = 0 + offsetX;
+        const uvRight = 0.25 + offsetX;
+        const uvBottom = 1;
+        const uvTop = 0;
+
+        // top left
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        // top
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvRight + 0.01;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        nodeUVs[uvIndex++] = uvRight + 0.01;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight + 0.01;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        // top right
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvTop;
+
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        // left
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        // center
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight + 0.01;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+        nodeUVs[uvIndex++] = uvRight + 0.01;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        // right
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom - 0.01;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+
+        // bottom left
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvTop;
+
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+
+        // bottom
+        nodeUVs[uvIndex++] = uvRight + 0.01;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+
+        nodeUVs[uvIndex++] = uvRight + 0.01;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvRight + 0.01;
+        nodeUVs[uvIndex++] = uvTop;
+
+        // bottom right
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvBottom;
+        nodeUVs[uvIndex++] = uvRight;
+        nodeUVs[uvIndex++] = uvTop;
+        nodeUVs[uvIndex++] = uvLeft;
+        nodeUVs[uvIndex++] = uvTop;
+
+        return uvIndex;
     }
 }
